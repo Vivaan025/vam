@@ -8,3 +8,5 @@ dist/
 results.jsonl
 *.mp4
 *.avi
+.venv/
+venv/
