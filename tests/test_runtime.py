@@ -25,3 +25,11 @@ def test_profiler_records_spans():
     assert [s.name for s in p.spans] == ["a", "b"]
     assert "total" in p.report()
     assert set(p.as_dict()) == {"a", "b"}
+
+
+def test_cuda_usable_is_bool_and_cached():
+    from vam.runtime import profiler as prof
+
+    first = prof.cuda_usable()
+    assert isinstance(first, bool)
+    assert prof.cuda_usable() is first

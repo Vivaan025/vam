@@ -8,6 +8,23 @@ from dataclasses import dataclass, field
 
 import torch
 
+_CUDA_OK: bool | None = None
+
+
+def cuda_usable() -> bool:
+    """True if a CUDA context can actually be created (not just if a GPU is visible).
+
+    On shared machines the GPU may be fully occupied by another process, in which
+    case torch.cuda.is_available() is True but any CUDA call raises. Probe once.
+    """
+    global _CUDA_OK
+    if _CUDA_OK is None:
+        try:
+            _CUDA_OK = torch.cuda.is_available() and (torch.cuda.synchronize() or True)
+        except Exception:
+            _CUDA_OK = False
+    return _CUDA_OK
+
 
 @dataclass
 class Span:
@@ -22,7 +39,7 @@ class Profiler:
 
     @contextmanager
     def span(self, name: str):
-        cuda = torch.cuda.is_available()
+        cuda = cuda_usable()
         if cuda:
             torch.cuda.synchronize()
             torch.cuda.reset_peak_memory_stats()
