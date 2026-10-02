@@ -32,13 +32,14 @@ def main() -> None:
             "select_ms": mean("select_ms"), "decode_ms": mean("decode_ms"), "infer_ms": mean("infer_ms"),
             "total_ms": mean("select_ms") + mean("decode_ms") + mean("infer_ms"),
             "peak_mb": mean("infer_peak_mb"),
+            "hit_rate": mean("hit_rate") if "hit_rate" in rs[0] else float("nan"),
         })
 
-    hdr = f"{'gpu':28} {'sampler':8} {'budget':>6} {'n':>5} {'top1':>6} {'select':>8} {'decode':>8} {'infer':>8} {'total':>8}"
+    hdr = f"{'gpu':28} {'sampler':8} {'budget':>6} {'n':>5} {'top1':>6} {'select':>8} {'decode':>8} {'infer':>8} {'total':>8} {'hit':>5}"
     print(hdr)
     for r in rows:
         print(f"{r['gpu'][:28]:28} {r['sampler']:8} {r['budget']:6d} {r['n']:5d} {r['top1']:6.3f} "
-              f"{r['select_ms']:8.1f} {r['decode_ms']:8.1f} {r['infer_ms']:8.1f} {r['total_ms']:8.1f}")
+              f"{r['select_ms']:8.1f} {r['decode_ms']:8.1f} {r['infer_ms']:8.1f} {r['total_ms']:8.1f} {r['hit_rate']:5.2f}")
 
     if args.csv:
         with open(args.csv, "w", newline="") as f:
