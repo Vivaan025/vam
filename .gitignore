@@ -10,5 +10,5 @@ results.jsonl
 *.avi
 .venv/
 venv/
-data/
-results/
+/data/
+/results/
