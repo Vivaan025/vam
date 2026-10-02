@@ -104,7 +104,11 @@ def main() -> None:
                 hit_sum = 0.0
                 t_start = time.time()
                 for uv in ds:
-                    v = uv.video()
+                    try:
+                        v = uv.video()
+                    except OSError as e:
+                        print(f"skip {uv.video_id}: {e}", flush=True)
+                        continue
                     if sname == "uniform":
                         sampler = UniformSampler(budget)
                     elif sname == "motion":
