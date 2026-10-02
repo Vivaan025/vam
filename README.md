@@ -50,6 +50,10 @@ Three rules keep this a library rather than a model zoo:
 - [x] `Profiler` (wall time + peak GPU memory per stage), `FeatureCache` (LRU, memory budget)
 - [x] `Stream` with overlapping windows
 - [x] Benchmark harness writing JSONL with GPU name, for cross-machine comparison
+- [x] UCF101 dataset + linear-probe evaluation: accuracy vs frame budget vs latency
+      (`docs/results/ucf101_phase1.md`)
+- [x] THUMOS14 untrimmed long-video benchmark with oracle upper bound and hit-rate metric
+- [ ] GPU decode (NVDEC) + GPU preprocessing; one decode pass shared by scorer and model
 - [ ] Adaptive frame scheduler (research contribution)
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline
