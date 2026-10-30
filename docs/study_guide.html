@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>vam Study Guide</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1a1a; --muted: #5c5c5c; --rule: #e3e3e3; --soft: #f5f5f5;
+    --accent: #2a62c9; --accent-tint: rgba(42, 98, 201, 0.10); --good: #2e8b57; --bad: #c0392b;
+    --code-bg: #f3f4f6; --max: 820px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121212; --fg: #ececec; --muted: #a8a8a8; --rule: #2c2c2c; --soft: #1b1b1b;
+      --accent: #6d9bef; --accent-tint: rgba(109, 155, 239, 0.14); --code-bg: #1e1f22;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121212; --fg: #ececec; --muted: #a8a8a8; --rule: #2c2c2c; --soft: #1b1b1b;
+    --accent: #6d9bef; --accent-tint: rgba(109, 155, 239, 0.14); --code-bg: #1e1f22;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: var(--max); margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 4px; }
+  .byline { color: var(--muted); font-size: 0.9rem; margin-bottom: 32px; }
+  h2 { font-size: 1.4rem; margin: 48px 0 12px; padding-top: 16px; border-top: 1px solid var(--rule); }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  p { margin: 0 0 12px; }
+  ul, ol { padding-left: 22px; margin: 0 0 12px; }
+  li { margin-bottom: 6px; }
+  code { font: 0.88em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 0 0 16px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 0 0 16px; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .callout { background: var(--accent-tint); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .quiet { color: var(--muted); }
+  figure { margin: 20px 0; }
+  figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 6px; }
+  svg { width: 100%; height: auto; display: block; }
+  .toc { background: var(--soft); border-radius: 8px; padding: 14px 18px; margin-bottom: 8px; }
+  .toc ol { margin: 0; columns: 2; column-gap: 24px; }
+  @media (max-width: 600px) { .toc ol { columns: 1; } }
+  .toc a { color: var(--accent); text-decoration: none; }
+  a { color: var(--accent); }
+  dl dt { font-weight: 600; margin-top: 10px; }
+  dl dd { margin: 2px 0 0 0; }
+  .sop { font-style: italic; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>vam: Study Guide and Pitch</h1>
+<div class="byline">Vivaan Lakhani · as of 31 October 2026 · repo: <a href="https://github.com/Vivaan025/vam">github.com/Vivaan025/vam</a></div>
+
+<nav class="toc">
+<ol>
+  <li><a href="#pitch">The pitch in one paragraph</a></li>
+  <li><a href="#background">Background for a beginner</a></li>
+  <li><a href="#what">What vam is</a></li>
+  <li><a href="#measured">What we measured</a></li>
+  <li><a href="#question">The research question</a></li>
+  <li><a href="#next">What we are building next</a></li>
+  <li><a href="#novel">How this is novel</a></li>
+  <li><a href="#useful">Why it is useful</a></li>
+  <li><a href="#admissions">Pitch for master's applications</a></li>
+  <li><a href="#glossary">Glossary</a></li>
+  <li><a href="#reading">Reading list</a></li>
+</ol>
+</nav>
+
+<h2 id="pitch">1. The pitch in one paragraph</h2>
+<p><code>vam</code> is an open-source library and runtime for video-action models: models that look at video and either recognise what action is happening or decide what action an agent should take next. Its claim is simple. On long, real-world video the cost of a model is set by how many frames it looks at, and most frames are wasted. On 200 three-minute THUMOS14 videos, a standard model that picks frames evenly is right 73% of the time with 4 frames. The same model given the <em>right</em> 4 frames is right 89% of the time. That 16-point gap is pure frame selection, and no library closes it today, because choosing frames well costs more than it saves when the decoder is naive. <code>vam</code> builds the missing layer between video files and models: a scheduler that decides which frames deserve compute, and a runtime that makes that decision nearly free by scanning only keyframes, decoding once, and keeping the GPU fed. PyTorch owns tensors, Hugging Face owns models, <code>vam</code> owns the video-to-action pipeline.</p>
+
+<h2 id="background">2. Background for a beginner</h2>
+<p>A video action model takes video in and produces a decision about actions. There are two kinds, and <code>vam</code> is designed to serve both.</p>
+<ul>
+  <li><strong>Action recognition.</strong> Input: a clip. Output: a label such as <em>diving</em> or <em>golf swing</em>. This is what the Kinetics, UCF101 and THUMOS14 benchmarks test, and what we measure today.</li>
+  <li><strong>Action prediction.</strong> Input: what a robot or agent sees. Output: what it should do next, as a sequence of actions. Models like OpenVLA and the policies in LeRobot do this. Same video pipeline, different head.</li>
+</ul>
+
+<h3>Why video is expensive</h3>
+<p>An image model processes one picture. A video model processes many pictures plus their relationships over time. A transformer's attention cost grows with the square of the number of tokens, and every frame adds hundreds of tokens. A 3-minute video at 30 frames per second has 5,400 frames. No model looks at all of them. Every video model therefore <em>samples</em>: it picks a small number of frames, usually 8 to 32, and ignores the rest.</p>
+
+<h3>The frame budget</h3>
+<p>We call the number of frames a model is allowed to see its <em>budget</em>. A budget of 4 means the model sees four pictures out of thousands and must decide from those. A smaller budget means less compute, less memory and lower latency, which matters on a robot, a phone, or a server handling many streams at once. The question that drives the whole project is: <em>given a budget, which frames should the model see?</em></p>
+
+<h3>Uniform sampling</h3>
+<p>Uniform sampling is what nearly everyone does: spread the budget evenly across the video. It is free to compute and works well on short clips that have been trimmed to the action. It fails on long video, because the action may occupy a few seconds out of minutes, and evenly spaced frames mostly land on background. We measured exactly this: on THUMOS14, only about 30% of uniformly chosen frames land inside the action, regardless of budget.</p>
+
+<h3>Decoding, and why keyframes matter</h3>
+<p>Decoding turns a compressed video file into pixels. Compressed video stores most frames as differences from earlier frames. Only <em>keyframes</em> (roughly one every few seconds) are stored whole. Reading one arbitrary frame means finding the previous keyframe and decoding forward from it. That is why pulling 16 scattered frames from a 3-minute file costs about half a second on a fast CPU, more than the model forward pass itself. Decoding <em>only</em> keyframes is far cheaper, because there is nothing to decode forward from. That fact is the heart of the runtime we are building.</p>
+
+<h3>Frames versus tokens</h3>
+<p>Inside a transformer each frame becomes a grid of patches, and each patch becomes a token. Dropping a frame drops all of its tokens. A finer lever is to keep a frame but drop its uninformative patches. That is <em>token sparsity</em>, and it is how the budget will eventually control compute inside the model, not just at the decoder. It matters because the model we use, VideoMAE, takes exactly 16 frames: giving it 4 frames today means padding to 16, so a smaller budget saves decode work but not model work. Token sparsity fixes that.</p>
+
+<h3>Linear probe</h3>
+<p>A pretrained model is kept frozen, and one small linear layer is trained on top of its output features. It is the cheapest honest way to measure how good a model's features are on a new dataset. We use it so that every sampler is scored by the same fixed head and only the choice of frames differs. The head was fitted once on UCF101 and then used unchanged on THUMOS14, which shares 20 of its classes.</p>
+
+<h2 id="what">3. What vam is</h2>
+<p><code>vam</code> is a Python library that sits on top of PyTorch and under your model. It owns everything between a video file and a model's input, and everything between a model's output and an action.</p>
+
+<figure>
+<svg viewBox="0 0 760 470" role="img" aria-label="vam sits between video files and PyTorch; the runtime layer is the research">
+  <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+  <text x="24" y="28" font-size="15" font-weight="600" fill="var(--fg)">vam sits between video files and PyTorch; the runtime layer is the research</text>
+  <g fill="none" stroke="var(--muted)" stroke-width="1.25">
+    <path d="M380 112V134" marker-end="url(#arr)"/><path d="M380 194V216" marker-end="url(#arr)"/>
+    <path d="M380 276V298" marker-end="url(#arr)"/><path d="M380 358V380" marker-end="url(#arr)"/>
+  </g>
+  <rect x="24" y="52" width="712" height="60" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+  <text x="40" y="76" font-size="13" font-weight="600" fill="var(--fg)">API</text>
+  <text x="40" y="96" font-size="11.5" fill="var(--muted)">Video (lazy decode) · FrameBatch · ActionOutput (logits or actions) · Stream (live windows)</text>
+  <rect x="24" y="134" width="712" height="60" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+  <text x="40" y="158" font-size="13" font-weight="600" fill="var(--fg)">Samplers: which frames the model sees</text>
+  <text x="40" y="178" font-size="11.5" fill="var(--muted)">Uniform · Motion · Oracle (upper bound) · Adaptive scheduler (next)</text>
+  <rect x="24" y="216" width="712" height="60" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+  <text x="40" y="240" font-size="13" font-weight="600" fill="var(--fg)">Model adapters: existing models plug in, never reimplemented</text>
+  <text x="40" y="260" font-size="11.5" fill="var(--muted)">Hugging Face video classifiers (VideoMAE, TimeSformer) · LinearProbe · robot policies (later)</text>
+  <rect x="24" y="298" width="712" height="60" rx="8" fill="var(--accent)" fill-opacity="0.12" stroke="var(--accent)" stroke-width="2"/>
+  <text x="40" y="322" font-size="13" font-weight="600" fill="var(--fg)">Runtime: make frame selection nearly free</text>
+  <text x="40" y="342" font-size="11.5" fill="var(--muted)">Profiler · FeatureCache · keyframe scan (next) · GPU decode (next) · async pipeline (next)</text>
+  <rect x="24" y="380" width="712" height="60" rx="8" fill="none" stroke="var(--muted)" stroke-width="1.25"/>
+  <text x="40" y="404" font-size="13" font-weight="600" fill="var(--fg)">PyTorch / CUDA</text>
+  <text x="40" y="424" font-size="11.5" fill="var(--muted)">The backend. Custom kernels only where profiling proves a hot spot.</text>
+</svg>
+<figcaption>Data flows top to bottom: load lazily, choose frames, decode and cache, run the model, return one ActionOutput type.</figcaption>
+</figure>
+
+<h3>The user experience today</h3>
+<pre><code>import vam
+
+video = vam.load_video("match.mp4")
+model = vam.get_model("videomae-base-kinetics")
+
+out = model(video, sampler=vam.UniformSampler(8))
+print(out.top_k(3))
+
+for chunk in vam.Stream(0, window=16, hop=8):   # webcam
+    print(model(chunk).top_k(1))</code></pre>
+
+<h3>Three design rules</h3>
+<ol>
+  <li><strong>Models never touch video.</strong> They receive a <code>FrameBatch</code> and return an <code>ActionOutput</code>. The runtime can swap samplers, cache features and stream without any model knowing.</li>
+  <li><strong>One output type for both meanings of action model.</strong> Recognition fills <code>logits</code>; a robot policy fills <code>actions</code>. Everything above the model works for both.</li>
+  <li><strong>PyTorch is the backend, not the competitor.</strong> Custom kernels replace an operator only after profiling shows it is the bottleneck.</li>
+</ol>
+<p><strong>Built and tested today:</strong> the API types, uniform and motion samplers, the Hugging Face adapter, a linear probe, profiler and feature cache, streaming windows, two dataset loaders (UCF101, THUMOS14), two benchmark harnesses, and 17 tests that pass on a 4 GB laptop GPU and a 32 GB RTX 5090.</p>
+
+<h2 id="measured">4. What we measured</h2>
+<p>Two experiments, both on an RTX 5090 with a frozen VideoMAE-base backbone and a linear-probe head fitted once on 2,000 UCF101 training clips.</p>
+
+<h3>Experiment 1: trimmed clips (UCF101, 1,000 test clips, 101 classes)</h3>
+<table>
+<tr><th>frames</th><th class="num">uniform top-1</th><th class="num">motion top-1</th><th class="num">uniform total ms</th><th class="num">motion total ms</th></tr>
+<tr><td>2</td><td class="num">0.811</td><td class="num">0.812</td><td class="num">45</td><td class="num">75</td></tr>
+<tr><td>4</td><td class="num">0.877</td><td class="num">0.873</td><td class="num">40</td><td class="num">79</td></tr>
+<tr><td>8</td><td class="num">0.938</td><td class="num">0.939</td><td class="num">48</td><td class="num">82</td></tr>
+<tr><td>16</td><td class="num">0.960</td><td class="num">0.960</td><td class="num">65</td><td class="num">102</td></tr>
+</table>
+<p>What it says: on short clips that are already trimmed to the action, uniform sampling is near-optimal. Eight frames reach within two points of sixteen. Motion-based sampling gains nothing and costs 35 ms of scoring. The GPU model forward is about 7 ms; everything else is CPU decode and preprocessing. This was a negative result for "smart sampling", and it told us where the real problem lives.</p>
+
+<h3>Experiment 2: untrimmed video (THUMOS14, 200 validation videos, about 3 minutes each, 20 classes)</h3>
+<p>Here the action is a sliver of the timeline. We added an <em>oracle</em> sampler that knows the annotations and samples only inside the action. No real system can do that, but it is the ceiling for any frame-selection policy.</p>
+
+<figure>
+<svg viewBox="0 0 760 360" role="img" aria-label="Oracle frame selection beats uniform by 16 points at 4 frames on THUMOS14">
+  <text x="24" y="28" font-size="15" font-weight="600" fill="var(--fg)">Knowing where the action is lifts top-1 by 16 points at 4 frames (THUMOS14)</text>
+  <text x="24" y="48" font-size="11.5" fill="var(--muted)">top-1 accuracy, 200 untrimmed videos, same frozen model and head for every line</text>
+  <!-- axes: x = frames (4,8,16,32) at 120,300,480,660; y = 0.65..1.00 mapped to 300..90 -->
+  <g stroke="var(--rule)" stroke-width="1">
+    <line x1="80" y1="300" x2="700" y2="300"/><line x1="80" y1="240" x2="700" y2="240"/>
+    <line x1="80" y1="180" x2="700" y2="180"/><line x1="80" y1="120" x2="700" y2="120"/>
+  </g>
+  <g font-size="11.5" fill="var(--muted)">
+    <text x="70" y="304" text-anchor="end">0.65</text><text x="70" y="244" text-anchor="end">0.75</text>
+    <text x="70" y="184" text-anchor="end">0.85</text><text x="70" y="124" text-anchor="end">0.95</text>
+    <text x="120" y="324" text-anchor="middle">4</text><text x="300" y="324" text-anchor="middle">8</text>
+    <text x="480" y="324" text-anchor="middle">16</text><text x="660" y="324" text-anchor="middle">32</text>
+    <text x="390" y="346" text-anchor="middle">frames the model sees</text>
+  </g>
+  <!-- y(v) = 300 - (v-0.65)*600 -->
+  <!-- oracle: .890 .925 .955 .950 -> 156, 135, 117, 120 -->
+  <polyline points="120,156 300,135 480,117 660,120" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+  <g fill="var(--accent)"><circle cx="120" cy="156" r="4"/><circle cx="300" cy="135" r="4"/><circle cx="480" cy="117" r="4"/><circle cx="660" cy="120" r="4"/></g>
+  <!-- uniform: .730 .795 .885 .850 -> 252, 213, 159, 180 -->
+  <polyline points="120,252 300,213 480,159 660,180" fill="none" stroke="var(--muted)" stroke-width="2"/>
+  <g fill="var(--muted)"><circle cx="120" cy="252" r="4"/><circle cx="300" cy="213" r="4"/><circle cx="480" cy="159" r="4"/><circle cx="660" cy="180" r="4"/></g>
+  <!-- motion: .705 .755 .805 .850 -> 267, 237, 207, 180 -->
+  <polyline points="120,267 300,237 480,207 660,180" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <g fill="var(--muted)"><circle cx="120" cy="267" r="3"/><circle cx="300" cy="237" r="3"/><circle cx="480" cy="207" r="3"/><circle cx="660" cy="180" r="3"/></g>
+  <g font-size="12" font-weight="600">
+    <text x="132" y="148" fill="var(--accent)">oracle 0.89</text>
+    <text x="132" y="270" fill="var(--muted)">uniform 0.73</text>
+    <text x="132" y="290" fill="var(--muted)" font-weight="400">motion 0.71</text>
+    <text x="672" y="124" fill="var(--accent)">0.95</text>
+    <text x="672" y="186" fill="var(--muted)">0.85</text>
+  </g>
+  <line x1="120" y1="156" x2="120" y2="252" stroke="var(--accent)" stroke-width="1" stroke-dasharray="3 3"/>
+  <text x="108" y="208" font-size="11.5" fill="var(--accent)" text-anchor="end">+16 pts</text>
+</svg>
+<figcaption>From docs/results/thumos14_phase2.md. Oracle samples uniformly inside the annotated action; uniform and motion are real policies.</figcaption>
+</figure>
+
+<table>
+<tr><th>frames</th><th class="num">uniform</th><th class="num">motion</th><th class="num">oracle</th><th class="num">frames inside action (uniform)</th><th class="num">uniform total ms</th><th class="num">motion total ms</th></tr>
+<tr><td>4</td><td class="num">0.730</td><td class="num">0.705</td><td class="num">0.890</td><td class="num">29%</td><td class="num">578</td><td class="num">2,130</td></tr>
+<tr><td>8</td><td class="num">0.795</td><td class="num">0.755</td><td class="num">0.925</td><td class="num">30%</td><td class="num">520</td><td class="num">2,111</td></tr>
+<tr><td>16</td><td class="num">0.885</td><td class="num">0.805</td><td class="num">0.955</td><td class="num">30%</td><td class="num">746</td><td class="num">2,408</td></tr>
+<tr><td>32</td><td class="num">0.850</td><td class="num">0.850</td><td class="num">0.950</td><td class="num">29%</td><td class="num">1,243</td><td class="num">2,956</td></tr>
+</table>
+
+<p><strong>Five findings, each of which decides something.</strong></p>
+<ol>
+  <li><strong>Frame selection matters on long video.</strong> Oracle beats uniform by 16 points at 4 frames and 13 at 8. Oracle with 4 frames (0.89) beats uniform with 16 frames (0.885) using a quarter of the frames. On trimmed clips this gap did not exist.</li>
+  <li><strong>Uniform sampling sees the action only 30% of the time</strong>, independent of budget. Blind sampling wastes 70% of the budget on background.</li>
+  <li><strong>Pixel-motion scoring is worse than uniform</strong> at every budget and costs 1.5 s per video. Sports footage is full of camera pans and crowd movement. Frame differencing finds <em>change</em>, not <em>the action</em>. A useful scorer must be semantic.</li>
+  <li><strong>Decode dominates, by seeking.</strong> Random-access decode of 16 frames from a 3-minute file costs about 500 ms, twice the model forward, because each read seeks to a keyframe and decodes forward.</li>
+  <li><strong>Uniform gets worse at 32 frames</strong> because VideoMAE takes exactly 16 and the extra frames are subsampled back at a different stride. Budgets above the model's native length need token-level control, not frame subsampling.</li>
+</ol>
+
+<h2 id="question">5. The research question</h2>
+<div class="callout">
+<p><strong>How much of the gap between uniform and oracle frame selection can a runtime close on long video, at a total latency no higher than uniform sampling?</strong></p>
+<p class="quiet">Headroom: 16 points at 4 frames, 13 at 8, 7 at 16 on THUMOS14 validation. Latency baseline: 578 ms per video at 4 frames, of which about 450 ms is decode plus CPU preprocessing. Success means a higher top-1 than uniform at the same budget with total milliseconds at or below uniform's, measured on two GPU tiers.</p>
+</div>
+<p>Three things make this a good question. The headroom is measured, not assumed. The constraint is honest: a scorer that costs more than it saves is not a result, and our own motion sampler already demonstrates that failure mode. And it is a systems question as much as a modelling question, because the latency budget is set by the decoder, not the network.</p>
+
+<h2 id="next">6. What we are building next</h2>
+<p>Each piece follows from a specific number above.</p>
+
+<h3>Keyframe-scan runtime <span class="quiet">(from finding 4)</span></h3>
+<p>A decoder can be told to decode only keyframes, skipping all inter-frame work. A 3-minute file has roughly 50 to 90 keyframes, so scanning them costs a fraction of one random-access read. The runtime will scan keyframes once at low resolution, score them, pick the best moments, and then decode full-resolution frames only there. Scoring becomes nearly free because it rides on frames the decoder gives away cheaply.</p>
+
+<h3>Semantic scorer <span class="quiet">(from finding 3)</span></h3>
+<p>Pixel differencing failed, so the scorer must understand content. First candidate: CLIP zero-shot similarity between each keyframe and the class names, which is a few milliseconds per keyframe on a GPU. Second: coarse-to-fine, where a cheap first pass of the model itself estimates where it is confident. Third: a small scorer trained to imitate the oracle on THUMOS14 training annotations.</p>
+
+<h3>Adaptive scheduler <span class="quiet">(from findings 1 and 2)</span></h3>
+<p>Given a budget in milliseconds rather than frames, decide how many frames to decode and where, using the keyframe scores. This is the research contribution: a policy evaluated on the uniform-versus-oracle gap under a latency constraint.</p>
+
+<h3>GPU decode and GPU preprocessing <span class="quiet">(from Experiment 1)</span></h3>
+<p>Full-resolution frames decode on the GPU with NVDEC and are resized and normalised there, so the 250 ms of CPU preprocessing per video disappears and the model is fed directly from device memory.</p>
+
+<h3>Token sparsity <span class="quiet">(from finding 5)</span></h3>
+<p>Make compute follow the budget inside the transformer by dropping uninformative patches, so a 4-frame budget costs a quarter of a 16-frame budget in model time, not only in decode time.</p>
+
+<h3>Policy adapter</h3>
+<p>Plug in a robot policy such as OpenVLA or a LeRobot model so that the "both meanings of action" claim is demonstrated, not asserted. The streaming API already has the shape such models need.</p>
+
+<h2 id="novel">7. How this is novel, honestly</h2>
+<p>Adaptive frame sampling is an established research area. Anyone evaluating this project will know that, so the pitch must be precise about what is new.</p>
+
+<h3>What already exists</h3>
+<ul>
+  <li><strong>Learned frame selectors.</strong> SCSampler (Korbar et al., 2019), AdaFrame (Wu et al., 2019), MGSampler, OCSampler (Lin et al., 2022) and FrameExit (Ghodrati et al., 2021) all learn to pick or stop on informative frames. They report accuracy against frame count, and their selectors usually need their own decode pass over many frames, which is the cost our data shows is the real bottleneck.</li>
+  <li><strong>Compressed-domain methods.</strong> CoViAR (Wu et al., 2018) and successors read motion vectors and residuals from the compressed stream instead of decoding pixels. Powerful, but tied to one codec's internals and rarely productised.</li>
+  <li><strong>Token reduction.</strong> ToMe (Bolya et al., 2023) and related token-merging work reduce transformer cost per frame. Orthogonal to frame choice, and part of our plan.</li>
+  <li><strong>Libraries.</strong> PyTorchVideo and MMAction2 give you models and uniform samplers. Decord and NVIDIA DALI give you fast decoders. Hugging Face gives you pretrained weights. None of them makes frame selection a runtime concern with a latency budget, and none ships a scheduler.</li>
+</ul>
+
+<h3>What is actually new here</h3>
+<ol>
+  <li><strong>Treating frame selection as a systems problem with a latency budget.</strong> Papers report accuracy versus frames. We report accuracy versus wall-clock milliseconds, including the selector's own cost, on real hardware. Our motion-sampler result shows why that matters: a policy can win on frames and lose on time.</li>
+  <li><strong>Keyframe-scan scheduling.</strong> Using the codec's own keyframe structure as the free scan for a semantic scorer, then decoding full frames only at chosen moments. This co-designs the scheduler with the decoder rather than treating decode as a fixed cost.</li>
+  <li><strong>A reusable runtime, not a paper artefact.</strong> The scheduler, cache and decoder sit under any Hugging Face video model and, later, under robot policies, through one interface. The analogy is vLLM for language models: it did not invent attention, it made serving cheap enough that everyone used it.</li>
+  <li><strong>An honest oracle-based evaluation.</strong> Reporting the uniform-to-oracle gap on every benchmark gives a headroom number that most sampling papers leave out, and it makes negative results (like ours on UCF101) informative instead of embarrassing.</li>
+</ol>
+<p class="quiet">What to never claim: that we invented adaptive sampling, that uniform sampling is bad in general, or that the library is "the standard". Claim the measured gap, the latency-constrained framing, and the decoder co-design.</p>
+
+<h2 id="useful">8. Why it is useful</h2>
+<ul>
+  <li><strong>Robots and embodied agents.</strong> A policy running on an onboard GPU has a fixed millisecond budget per decision. Spending it on the frames that matter is the difference between a usable and an unusable control rate.</li>
+  <li><strong>Edge devices.</strong> Phones, cameras and AR glasses cannot decode and process every frame. A runtime that scans keyframes and decodes a handful of frames per second makes video understanding feasible on a 4 GB GPU, which is exactly where we develop.</li>
+  <li><strong>Video agents and long-video question answering.</strong> Systems that reason over hour-long video need to find the few relevant minutes before spending model compute. Scheduler plus cache is the missing primitive.</li>
+  <li><strong>Serving at scale.</strong> A server handling thousands of streams spends most of its cost on decode and preprocessing, as our profiles show. Halving that is a direct cost reduction independent of the model.</li>
+  <li><strong>Researchers.</strong> A common harness that reports accuracy, latency, memory and the oracle gap for any sampler on any Hugging Face model turns sampling papers into comparable results.</li>
+</ul>
+
+<h2 id="admissions">9. Pitch for master's applications</h2>
+<h3>Statement-of-purpose paragraph</h3>
+<p class="sop">Video models are bounded by the frames they see, and on real, untrimmed video most frames are background. In my open-source project vam I built the infrastructure to measure and attack this. Using a frozen VideoMAE backbone with a fixed linear head, I showed that on 200 untrimmed THUMOS14 videos, oracle frame selection beats uniform sampling by 16 points of top-1 accuracy at a 4-frame budget, while on trimmed UCF101 clips the gap vanishes. Profiling on an RTX 5090 showed the model forward is a minority of wall time; decode seeking and CPU preprocessing dominate, and a naive motion-based selector loses on latency even when it matches on accuracy. I am now building a decode-aware runtime that scans only codec keyframes for a cheap semantic scorer and decodes full frames only where they matter, evaluated against a latency budget rather than a frame count. The project combines GPU systems work (asynchronous decode, memory management, kernel-level profiling) with a precise empirical question, and it is the kind of systems-for-ML research I want to pursue in graduate study.</p>
+
+<h3>Talking points</h3>
+<ul>
+  <li>One precise question with measured headroom: 16 points at 4 frames.</li>
+  <li>A negative result you understand: motion sampling fails on sports footage because it detects change, not actions, and it costs 1.5 s. Explaining why is more impressive than hiding it.</li>
+  <li>Systems depth: you can explain keyframe seeking, why random access costs 500 ms, why the GPU sits idle, and what NVDEC changes.</li>
+  <li>Two GPU tiers: a 4 GB laptop and a 32 GB RTX 5090, with the same code and the same JSONL output format.</li>
+  <li>Engineering hygiene: tests on both machines, reproducible benchmarks, results committed with raw CSVs.</li>
+</ul>
+
+<h3>Questions you will be asked, and answers</h3>
+<dl>
+  <dt>"Isn't adaptive sampling already solved?"</dt>
+  <dd>Studied, not solved, and almost never evaluated against latency. Our data shows a selector can win on frame count and lose on time. The contribution is the runtime that makes selection cheaper than the frames it saves.</dd>
+  <dt>"Why not just use a bigger model or more frames?"</dt>
+  <dd>Because the cost is in decode and preprocessing, not the model. Uniform at 32 frames was slower and less accurate than uniform at 16. More frames is not the lever.</dd>
+  <dt>"Is the oracle a fair comparison?"</dt>
+  <dd>It is not a method, it is a ceiling. Reporting it is what makes the headroom honest. Any real scheduler is judged on how much of that ceiling it reaches.</dd>
+  <dt>"What is the single result you are proudest of?"</dt>
+  <dd>Oracle with 4 frames beats uniform with 16 frames. A quarter of the frames, higher accuracy, if you know where to look. Everything else is about learning where to look cheaply.</dd>
+  <dt>"What would you do with more compute?"</dt>
+  <dd>Train the scorer to imitate the oracle on THUMOS14 training annotations, evaluate on ActivityNet, and add a robot policy adapter to show the runtime transfers to action prediction.</dd>
+</dl>
+
+<h2 id="glossary">10. Glossary</h2>
+<dl>
+  <dt>Action recognition</dt><dd>Classifying which action a video shows.</dd>
+  <dt>Action prediction</dt><dd>Deciding what an agent should do next from what it sees.</dd>
+  <dt>Adapter</dt><dd>A thin wrapper that lets an existing model implement vam's interface without being rewritten.</dd>
+  <dt>Budget</dt><dd>The number of frames, or the milliseconds, a model is allowed to spend on one video.</dd>
+  <dt>CLIP</dt><dd>A model that maps images and text into the same space, so an image can be scored against a phrase like "a person diving" without training.</dd>
+  <dt>Codec</dt><dd>The compression scheme of a video file, for example H.264.</dd>
+  <dt>Decode</dt><dd>Turning compressed video into pixel frames.</dd>
+  <dt>Feature cache</dt><dd>Storing a model's intermediate outputs for frames so they are not recomputed when nothing changed.</dd>
+  <dt>Hit rate</dt><dd>The share of selected frames that fall inside an annotated action segment.</dd>
+  <dt>Keyframe (I-frame)</dt><dd>A frame stored in full in the compressed stream; every other frame is a difference from a neighbour.</dd>
+  <dt>Linear probe</dt><dd>A single linear layer trained on frozen features; a standard way to measure feature quality.</dd>
+  <dt>NVDEC</dt><dd>NVIDIA's hardware video decoder on the GPU.</dd>
+  <dt>Oracle sampler</dt><dd>A sampler that uses ground-truth annotations; the upper bound for frame selection.</dd>
+  <dt>Random access</dt><dd>Reading an arbitrary frame, which forces a seek to the previous keyframe and decoding forward.</dd>
+  <dt>Sampler</dt><dd>The component that turns a video and a budget into a list of frame indices.</dd>
+  <dt>Scheduler</dt><dd>A sampler that also reasons about time and compute cost, deciding how many frames and where under a latency budget.</dd>
+  <dt>THUMOS14</dt><dd>A dataset of untrimmed sports videos with the start and end of each action annotated.</dd>
+  <dt>Token sparsity</dt><dd>Dropping uninformative patches inside a transformer so compute falls without dropping whole frames.</dd>
+  <dt>Top-1</dt><dd>The fraction of videos where the model's highest-scoring class is correct.</dd>
+  <dt>UCF101</dt><dd>A dataset of 13,320 short trimmed clips in 101 action classes.</dd>
+  <dt>Uniform sampling</dt><dd>Picking frames at equal spacing across the video.</dd>
+  <dt>VideoMAE</dt><dd>A video transformer pretrained by reconstructing masked patches; takes 16 frames.</dd>
+</dl>
+
+<h2 id="reading">11. Reading list, in order</h2>
+<ol>
+  <li><strong>VideoMAE</strong> (Tong et al., 2022). The backbone we use. Read to understand why it needs 16 frames and what its tokens are.</li>
+  <li><strong>TSN: Temporal Segment Networks</strong> (Wang et al., 2016). The origin of sparse uniform sampling for video. Explains why uniform works on trimmed clips.</li>
+  <li><strong>SCSampler</strong> (Korbar et al., 2019). A cheap clip-level saliency sampler. The closest prior idea to a semantic scorer; note what it costs to run.</li>
+  <li><strong>AdaFrame</strong> (Wu et al., 2019) and <strong>FrameExit</strong> (Ghodrati et al., 2021). Learned, adaptive frame selection and early exit. Read for the evaluation protocols and for what they do not report: wall-clock latency.</li>
+  <li><strong>OCSampler</strong> (Lin et al., 2022). One-pass frame selection; compare its selector cost with our keyframe-scan idea.</li>
+  <li><strong>CoViAR: Compressed Video Action Recognition</strong> (Wu et al., 2018). Using the compressed stream directly. The strongest precedent for decoder co-design.</li>
+  <li><strong>Token Merging (ToMe)</strong> (Bolya et al., 2023). The token-sparsity lever we plan to add.</li>
+  <li><strong>vLLM: Efficient Memory Management for LLM Serving with PagedAttention</strong> (Kwon et al., 2023). Not about video. Read it as the model of what a runtime contribution looks like and how it is evaluated.</li>
+  <li><strong>THUMOS Challenge 2014</strong> dataset page and the <strong>UCF101</strong> paper (Soomro et al., 2012). Know your benchmarks.</li>
+  <li><strong>OpenVLA</strong> (Kim et al., 2024) and the <strong>LeRobot</strong> documentation. The action-prediction side of the library, for the policy adapter.</li>
+</ol>
+<p class="quiet">Reading advice: for each paper write three lines in your own words: what they measured, what they left out, and what vam would change. That list becomes your related-work section and your interview answers.</p>
+
+</main>
+</body>
+</html>
