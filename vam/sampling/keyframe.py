@@ -123,7 +123,10 @@ class ClipScorer:
         self.n_cls = len(names)
         with torch.inference_mode():
             t = self.proc(text=prompts, return_tensors="pt", padding=True).to(self.device)
-            e = self.model.get_text_features(**t)
+            # text_model + projection is stable across transformers 4.x and 5.x
+            # (get_text_features returns a tensor in 4.x and an output object in 5.x)
+            pooled = self.model.text_model(**t).pooler_output
+            e = self.model.text_projection(pooled)
             self.text = e / e.norm(dim=-1, keepdim=True)
 
     @staticmethod
@@ -136,7 +139,8 @@ class ClipScorer:
 
         with torch.inference_mode():
             px = self.proc(images=list(kf.thumbs), return_tensors="pt")["pixel_values"].to(self.device)
-            e = self.model.get_image_features(pixel_values=px)
+            pooled = self.model.vision_model(pixel_values=px).pooler_output
+            e = self.model.visual_projection(pooled)
             e = e / e.norm(dim=-1, keepdim=True)
             logits = 100.0 * e @ self.text.T
             p = logits.softmax(dim=-1)
