@@ -75,14 +75,30 @@ class Video:
                 raise IOError(f"could not open video: {self.path}")
         return self._cap
 
-    def read(self, indices: Sequence[int]) -> FrameBatch:
-        """Decode the given frame indices."""
+    def read(self, indices: Sequence[int], seq_threshold: int = 64) -> FrameBatch:
+        """Decode the given frame indices.
+
+        A seek (cap.set) lands on the previous keyframe and decodes forward, so it costs
+        up to a whole GOP. When the next wanted index is within `seq_threshold` frames of
+        the current position we read forward instead of seeking, which turns clustered
+        requests (e.g. a window after a keyframe) into one cheap sequential run.
+        """
         cap = self._capture()
         frames = []
         got = []
+        pos = -1  # index of the frame cap.read() would return next, -1 = unknown
         for idx in sorted(set(int(i) for i in indices)):
-            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            if pos < 0 or idx < pos or idx - pos > seq_threshold:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+                pos = idx
+            ok = True
+            while pos < idx and ok:
+                ok = cap.grab()
+                pos += 1
+            if not ok:
+                continue
             ok, bgr = cap.read()
+            pos += 1
             if not ok:
                 continue
             frames.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))

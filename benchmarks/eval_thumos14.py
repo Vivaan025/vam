@@ -31,7 +31,7 @@ import torch
 import vam
 from vam.data import THUMOS14, UCF101, UntrimmedVideo
 from vam.models.probe import HFFeatureExtractor, LinearProbe
-from vam.sampling import MotionSampler, Sampler, UniformSampler
+from vam.sampling import ClipScorer, KeyframeSampler, MotionSampler, OracleKeyframeScorer, Sampler, UniformSampler
 
 BACKBONES = {
     "videomae-base-kinetics": "MCG-NJU/videomae-base-finetuned-kinetics",
@@ -75,7 +75,8 @@ def main() -> None:
     ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES))
     ap.add_argument("--head", required=True, help="linear probe head .pt from eval_ucf101.py")
     ap.add_argument("--budgets", type=int, nargs="+", default=[4, 8, 16, 32])
-    ap.add_argument("--samplers", nargs="+", default=["uniform", "motion", "oracle"])
+    ap.add_argument("--samplers", nargs="+", default=["uniform", "oracle", "kf-oracle", "kf-clip"])
+    ap.add_argument("--window", type=float, default=5.0, help="seconds decoded after each chosen keyframe")
     ap.add_argument("--motion-stride", type=int, default=4, help="score every k-th frame for motion")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default="results/thumos14.jsonl")
@@ -92,6 +93,7 @@ def main() -> None:
     sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     print(gpu, "|", args.backbone, "|", ds, flush=True)
 
+    clip_scorer = ClipScorer(ds.classes) if "kf-clip" in args.samplers else None
     extractor = HFFeatureExtractor(BACKBONES[args.backbone])
     probe = LinearProbe(extractor, ucf.num_classes, ucf.classes).load_head(args.head)
 
@@ -113,8 +115,15 @@ def main() -> None:
                         sampler = UniformSampler(budget)
                     elif sname == "motion":
                         sampler = MotionSampler(budget, stride=args.motion_stride)
-                    else:
+                    elif sname == "oracle":
                         sampler = OracleSampler(budget, uv)
+                    elif sname == "kf-oracle":
+                        segs = [(s.start, s.end) for s in uv.segments]
+                        sampler = KeyframeSampler(budget, OracleKeyframeScorer(segs, args.window), window_s=args.window)
+                    elif sname == "kf-clip":
+                        sampler = KeyframeSampler(budget, clip_scorer, window_s=args.window)
+                    else:
+                        raise SystemExit(f"unknown sampler {sname}")
                     p = vam.Profiler()
                     try:
                         with p.span("select"):
