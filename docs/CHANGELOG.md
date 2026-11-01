@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-01 | `vam.runtime.preprocess.Preprocessor`: device-side resize/crop/normalise read from the HF processor config; used by `HFVideoClassifier`, `HFFeatureExtractor` and `ClipScorer` (`use_hf_processor=True` keeps the old path); tolerance tests vs both HF processors | `vam/runtime/preprocess.py`, `vam/models/hf.py`, `vam/models/probe.py`, `vam/sampling/keyframe.py` | [004](experiments/004-gpu-preprocessing.md) |
 | 2026-11-01 | Experiment log and changelog introduced; entries 001–003 written retroactively | `docs/experiments/`, `docs/CHANGELOG.md` | |
 | 2026-11-01 | Results of the keyframe runtime on THUMOS14 | `docs/results/thumos14_keyframe.md` | [003](experiments/003-keyframe-runtime.md) |
 | 2026-11-01 | `ClipScorer` uses `text_model`/`vision_model` + projections (transformers 4.x and 5.x) | `vam/sampling/keyframe.py` | 003 |

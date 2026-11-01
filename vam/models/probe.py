@@ -26,10 +26,8 @@ class HFFeatureExtractor(HFVideoClassifier):
         if batch.is_channels_first:
             frames = (frames * 255).clamp(0, 255).to(torch.uint8).permute(0, 2, 3, 1)
         frames = self._fit_length(frames)
-        inputs = self.processor(list(frames.cpu().numpy()), return_tensors="pt")
-        pixel_values = inputs["pixel_values"].to(self._dev, dtype=self.model.dtype)
         backbone = getattr(self.model, self.model.base_model_prefix)
-        hidden = backbone(pixel_values=pixel_values).last_hidden_state  # (1, tokens, dim)
+        hidden = backbone(pixel_values=self.pixel_values(frames)).last_hidden_state  # (1, tokens, dim)
         return hidden.mean(dim=1)[0].float()  # (dim,)
 
 

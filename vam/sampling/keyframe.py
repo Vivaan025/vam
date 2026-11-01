@@ -111,13 +111,17 @@ class ClipScorer:
                   "a blank screen", "a logo", "people talking", "a commercial break"]
 
     def __init__(self, class_names: list[str], model: str = "openai/clip-vit-base-patch32",
-                 device: str | None = None, template: str = "a photo of {}"):
+                 device: str | None = None, template: str = "a photo of {}", use_hf_processor: bool = False):
         import torch
         from transformers import CLIPModel, CLIPProcessor
+
+        from vam.runtime.preprocess import Preprocessor
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = CLIPModel.from_pretrained(model).eval().to(self.device)
         self.proc = CLIPProcessor.from_pretrained(model)
+        self.use_hf_processor = use_hf_processor
+        self.pre = Preprocessor.from_hf(self.proc.image_processor, device=self.device)
         names = [self._human(c) for c in class_names]
         prompts = [template.format(n) for n in names] + [template.format(b) for b in self.BACKGROUND]
         self.n_cls = len(names)
@@ -138,7 +142,10 @@ class ClipScorer:
         import torch
 
         with torch.inference_mode():
-            px = self.proc(images=list(kf.thumbs), return_tensors="pt")["pixel_values"].to(self.device)
+            if self.use_hf_processor:
+                px = self.proc(images=list(kf.thumbs), return_tensors="pt")["pixel_values"].to(self.device)
+            else:
+                px = self.pre(kf.thumbs)
             pooled = self.model.vision_model(pixel_values=px).pooler_output
             e = self.model.visual_projection(pooled)
             e = e / e.norm(dim=-1, keepdim=True)

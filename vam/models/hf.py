@@ -11,10 +11,12 @@ import torch
 from vam.core import ActionOutput, FrameBatch
 from vam.models.base import VideoActionModel
 from vam.models.registry import register
+from vam.runtime.preprocess import Preprocessor
 
 
 class HFVideoClassifier(VideoActionModel):
-    def __init__(self, name: str, device: str | None = None, dtype: torch.dtype = torch.float16):
+    def __init__(self, name: str, device: str | None = None, dtype: torch.dtype = torch.float16,
+                 use_hf_processor: bool = False):
         super().__init__()
         from transformers import AutoImageProcessor, AutoModelForVideoClassification
 
@@ -28,15 +30,22 @@ class HFVideoClassifier(VideoActionModel):
         cfg = self.model.config
         self.default_num_frames = int(getattr(cfg, "num_frames", 16))
         self.labels = [cfg.id2label[i] for i in range(len(cfg.id2label))]
+        self.use_hf_processor = use_hf_processor
+        self.pre = Preprocessor.from_hf(self.processor, device=dev)
+
+    def pixel_values(self, frames: torch.Tensor) -> torch.Tensor:
+        """uint8 (T,H,W,3) -> (1,T,3,H,W) on device in the model dtype."""
+        if self.use_hf_processor:
+            pv = self.processor(list(frames.cpu().numpy()), return_tensors="pt")["pixel_values"]
+            return pv.to(self._dev, dtype=self.model.dtype)
+        return self.pre(frames).unsqueeze(0).to(self.model.dtype)
 
     def forward_frames(self, batch: FrameBatch) -> ActionOutput:
         frames = batch.frames
         if batch.is_channels_first:
             frames = (frames * 255).clamp(0, 255).to(torch.uint8).permute(0, 2, 3, 1)
         frames = self._fit_length(frames)
-        inputs = self.processor(list(frames.cpu().numpy()), return_tensors="pt")
-        pixel_values = inputs["pixel_values"].to(self._dev, dtype=self.model.dtype)
-        out = self.model(pixel_values=pixel_values)
+        out = self.model(pixel_values=self.pixel_values(frames))
         return ActionOutput(logits=out.logits[0].float().cpu(), labels=self.labels)
 
     def _fit_length(self, frames: torch.Tensor) -> torch.Tensor:

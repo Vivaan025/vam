@@ -46,8 +46,17 @@ the project's success criterion.
   tensors before upload.
 - The laptop is memory-starved; correctness tests run with the small VideoMAE and tiny batches.
 
+## Changes made
+- `vam/runtime/preprocess.py`: `Preprocessor` (shortest-edge resize with `antialias=True`, centre crop,
+  rescale, normalise) and `Preprocessor.from_hf(processor)` that reads size / crop / mean / std /
+  resample from the HF config. VideoMAE: bilinear, ImageNet stats. CLIP: bicubic, CLIP stats.
+- `HFVideoClassifier.pixel_values()` and `HFFeatureExtractor` use it; `use_hf_processor=True` restores
+  the PIL path for A/B tests. `ClipScorer` likewise for thumbnails.
+- `tests/test_preprocess.py`: output within mean-abs 0.02 / max 0.5 (normalised units) of both HF
+  processors on smoothed random frames; 26 tests pass.
+
 ## Results
-*(to fill)*
+*(to fill after the server run)*
 
 ## Decision
 *(to fill)*
