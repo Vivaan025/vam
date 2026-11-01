@@ -54,9 +54,10 @@ Three rules keep this a library rather than a model zoo:
       (`docs/results/ucf101_phase1.md`)
 - [x] THUMOS14 untrimmed long-video benchmark with oracle upper bound and hit-rate metric
 - [x] Keyframe-scan two-stage sampler with oracle / CLIP scorers (`docs/results/thumos14_keyframe.md`)
-- [x] Device-side tensor preprocessing (`docs/results/thumos14_preprocess.md`): kf-clip-16 beats
-      uniform-16 by +5.5 pts top-1 at 33% less latency on THUMOS14
-- [ ] Cheaper keyframe scan; GPU decode (NVDEC)
+- [x] Device-side tensor preprocessing (`docs/results/thumos14_preprocess.md`)
+- [x] Process-parallel keyframe scan (`docs/results/thumos14_scan.md`): on THUMOS14 kf-clip beats
+      uniform at 16 frames by +5.5 pts top-1 at 2.3× lower latency (210 vs 486 ms/video)
+- [ ] GPU / PyAV windowed decode (NVDEC)
 - [ ] Adaptive window + learned scorer (research contribution)
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline

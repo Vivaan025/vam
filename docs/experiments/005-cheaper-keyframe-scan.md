@@ -1,6 +1,6 @@
 # 005 · Cheaper keyframe scan
 
-**Date:** 2026-11-01 · **Status:** in progress · **Results:** *(to fill)*
+**Date:** 2026-11-01 · **Status:** done · **Results:** [`docs/results/thumos14_scan.md`](../results/thumos14_scan.md)
 
 ## Motivation (from 004)
 After tensor preprocessing, kf-clip's selection cost is ~160 ms per video, of which CLIP scoring is
@@ -92,7 +92,18 @@ uniform-4 (148 ms) while scoring +7.5 points higher.
   keeps every other keyframe.
 
 ## Results
-*(to fill after the server run)*
+- Full run (200 videos, uniform + kf-clip, 4/8/16, 8 processes): kf-clip select 160 → 46 ms (scan ~38 ms
+  + CLIP ~8 ms), flat across budgets. Totals: kf-clip-4 264 → 152 ms (uniform-4 147); kf-clip-8
+  348 → 230 ms (uniform-8 277); kf-clip-16 325 → 210 ms (uniform-16 486). Top-1 identical to 004.
+- Hypothesis check: scan ≤ 50 ms ✔; kf-clip-4 ≤ 170 ms ✔; accuracy unchanged ✔.
+- Stride-2 ablation: saves only ~6 ms (per-worker fixed cost dominates now); top-1 within ±1.5 pts.
+  Not adopted.
+- Candidates not needed: grey/64² thumbnails (conversion was never the cost), ffmpeg pipe (slower),
+  NVDEC for the scan (deferred; the scan is no longer the bottleneck).
 
 ## Decision
-*(to fill)*
+Process-parallel scan is the default (threads on platforms without fork). kf-clip now dominates
+uniform on both axes at 8 and 16 frames and ties on latency at 4. The remaining costs are (a) windowed
+decode (85–166 ms, CPU OpenCV seeks) and (b) scorer quality (9.5 / 5 / 2 points below the oracle).
+Next: 006 adaptive window (accuracy, cheap), 007 learned scorer (accuracy), 008 PyAV/NVDEC windowed
+reader (latency).
