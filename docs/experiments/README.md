@@ -11,3 +11,4 @@ Raw numbers live in `docs/results/`; this log is the reasoning trail.
 | 003 | 2026-11-01 | [Keyframe-scan two-stage runtime](003-keyframe-runtime.md) | done | kf-clip beats uniform at every budget; kf-oracle = oracle at 8; select ~270 ms |
 | 004 | 2026-11-01 | [GPU-side preprocessing for scorer and backbone](004-gpu-preprocessing.md) | done | infer 300→20 ms; kf-clip-8 beats uniform-16 on latency at equal accuracy; kf-clip-16 wins both axes |
 | 005 | 2026-11-01 | [Cheaper keyframe scan](005-cheaper-keyframe-scan.md) | done | select 160→46 ms; kf-clip dominates uniform at 8 and 16 frames on both axes, ties latency at 4 |
+| 006 | 2026-11-01 | [Adaptive window and coarse-to-fine refinement](006-adaptive-window.md) | planned | |

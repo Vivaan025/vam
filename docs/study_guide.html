@@ -56,7 +56,7 @@
 <main>
 
 <h1>vam: Study Guide and Pitch</h1>
-<div class="byline">Vivaan Lakhani · as of 31 October 2026 · repo: <a href="https://github.com/Vivaan025/vam">github.com/Vivaan025/vam</a></div>
+<div class="byline">Vivaan Lakhani · as of 1 November 2026 · repo: <a href="https://github.com/Vivaan025/vam">github.com/Vivaan025/vam</a></div>
 
 <nav class="toc">
 <ol>
@@ -75,7 +75,7 @@
 </nav>
 
 <h2 id="pitch">1. The pitch in one paragraph</h2>
-<p><code>vam</code> is an open-source library and runtime for video-action models: models that look at video and either recognise what action is happening or decide what action an agent should take next. Its claim is simple. On long, real-world video the cost of a model is set by how many frames it looks at, and most frames are wasted. On 200 three-minute THUMOS14 videos, a standard model that picks frames evenly is right 73% of the time with 4 frames. The same model given the <em>right</em> 4 frames is right 89% of the time. That 16-point gap is pure frame selection, and no library closes it today, because choosing frames well costs more than it saves when the decoder is naive. <code>vam</code> builds the missing layer between video files and models: a scheduler that decides which frames deserve compute, and a runtime that makes that decision nearly free by scanning only keyframes, decoding once, and keeping the GPU fed. PyTorch owns tensors, Hugging Face owns models, <code>vam</code> owns the video-to-action pipeline.</p>
+<p><code>vam</code> is an open-source library and runtime for video-action models: models that look at video and either recognise what action is happening or decide what action an agent should take next. Its claim is simple. On long, real-world video the cost of a model is set by how many frames it looks at, and most frames are wasted. On 200 three-minute THUMOS14 videos, a standard model that picks frames evenly is right 73% of the time with 4 frames. The same model given the <em>right</em> 4 frames is right 89% of the time. That 16-point gap is pure frame selection, and no library closes it today, because choosing frames well costs more than it saves when the decoder is naive. <code>vam</code> builds the missing layer between video files and models: a scheduler that decides which frames deserve compute, and a runtime that makes that decision nearly free by scanning only keyframes, decoding once, and keeping the GPU fed. It already works: with a zero-shot CLIP scorer over keyframes, <code>vam</code> is 5.5 points more accurate than uniform sampling at 16 frames and 2.3 times faster per video (210 ms against 486 ms), with the same frozen model. PyTorch owns tensors, Hugging Face owns models, <code>vam</code> owns the video-to-action pipeline.</p>
 
 <h2 id="background">2. Background for a beginner</h2>
 <p>A video action model takes video in and produces a decision about actions. There are two kinds, and <code>vam</code> is designed to serve both.</p>
@@ -224,6 +224,19 @@ for chunk in vam.Stream(0, window=16, hop=8):   # webcam
   <li><strong>Uniform gets worse at 32 frames</strong> because VideoMAE takes exactly 16 and the extra frames are subsampled back at a different stride. Budgets above the model's native length need token-level control, not frame subsampling.</li>
 </ol>
 
+<h3>Experiments 3 to 5: the keyframe-scan runtime (1 November 2026)</h3>
+<p>The runtime described in section 6 is now built and measured. Scanning only keyframes, scoring them with zero-shot CLIP, decoding short windows after the best ones, preprocessing on the GPU and scanning with a process pool gives this accuracy-versus-latency frontier on the same 200 videos:</p>
+<table>
+<tr><th>policy</th><th class="num">top-1</th><th class="num">total ms per video</th></tr>
+<tr><td>uniform, 4 frames</td><td class="num">0.720</td><td class="num">147</td></tr>
+<tr><td>keyframe + CLIP, 4 frames</td><td class="num">0.795</td><td class="num">152</td></tr>
+<tr><td>keyframe + CLIP, 16 frames</td><td class="num">0.935</td><td class="num">210</td></tr>
+<tr><td>keyframe + CLIP, 8 frames</td><td class="num">0.875</td><td class="num">230</td></tr>
+<tr><td>uniform, 8 frames</td><td class="num">0.795</td><td class="num">277</td></tr>
+<tr><td>uniform, 16 frames</td><td class="num">0.880</td><td class="num">486</td></tr>
+</table>
+<p>Every uniform point above the cheapest one is dominated: at 8 frames the runtime is 8 points more accurate and 17% faster; at 16 frames it is 5.5 points more accurate and 2.3 times faster. With oracle keyframe scores the same runtime reaches the oracle ceiling at 8 frames, so the remaining gap is scorer quality, not the runtime. Full tables and the reasoning are in <code>docs/experiments/</code> and <code>docs/results/</code> in the repo.</p>
+
 <h2 id="question">5. The research question</h2>
 <div class="callout">
 <p><strong>How much of the gap between uniform and oracle frame selection can a runtime close on long video, at a total latency no higher than uniform sampling?</strong></p>
@@ -234,17 +247,17 @@ for chunk in vam.Stream(0, window=16, hop=8):   # webcam
 <h2 id="next">6. What we are building next</h2>
 <p>Each piece follows from a specific number above.</p>
 
-<h3>Keyframe-scan runtime <span class="quiet">(from finding 4)</span></h3>
-<p>A decoder can be told to decode only keyframes, skipping all inter-frame work. A 3-minute file has roughly 50 to 90 keyframes, so scanning them costs a fraction of one random-access read. The runtime will scan keyframes once at low resolution, score them, pick the best moments, and then decode full-resolution frames only there. Scoring becomes nearly free because it rides on frames the decoder gives away cheaply.</p>
+<h3>Keyframe-scan runtime <span class="quiet">(built; experiments 3 and 5)</span></h3>
+<p>A decoder can be told to decode only keyframes, skipping all inter-frame work. A 3-minute file has roughly 25 to 100 keyframes. Decoding one costs about 1.4 ms in software, and the per-frame Python work holds the interpreter lock, so the scan is split across a pool of worker processes: 46 ms per video on a 24-core host, against 500 ms for one random-access read of 16 frames. The runtime scans keyframes once at low resolution, scores them, picks the best moments, and decodes full-resolution frames only there, reading forward from each keyframe so no seeks are needed.</p>
 
-<h3>Semantic scorer <span class="quiet">(from finding 3)</span></h3>
-<p>Pixel differencing failed, so the scorer must understand content. First candidate: CLIP zero-shot similarity between each keyframe and the class names, which is a few milliseconds per keyframe on a GPU. Second: coarse-to-fine, where a cheap first pass of the model itself estimates where it is confident. Third: a small scorer trained to imitate the oracle on THUMOS14 training annotations.</p>
+<h3>Semantic scorer <span class="quiet">(CLIP built; learned scorer next)</span></h3>
+<p>Pixel differencing failed, so the scorer must understand content. The first scorer is CLIP zero-shot similarity between each keyframe and the class names against background prompts, about 8 ms per video on the GPU for all keyframes at once. It beats uniform at every budget with no training. Next: coarse-to-fine refinement inside each window (experiment 6), and a small scorer trained to imitate the oracle on THUMOS14 training annotations (experiment 7).</p>
 
 <h3>Adaptive scheduler <span class="quiet">(from findings 1 and 2)</span></h3>
 <p>Given a budget in milliseconds rather than frames, decide how many frames to decode and where, using the keyframe scores. This is the research contribution: a policy evaluated on the uniform-versus-oracle gap under a latency constraint.</p>
 
-<h3>GPU decode and GPU preprocessing <span class="quiet">(from Experiment 1)</span></h3>
-<p>Full-resolution frames decode on the GPU with NVDEC and are resized and normalised there, so the 250 ms of CPU preprocessing per video disappears and the model is fed directly from device memory.</p>
+<h3>GPU preprocessing <span class="quiet">(built; experiment 4)</span> and GPU decode <span class="quiet">(next)</span></h3>
+<p>Resizing and normalising frames is now done as batched tensor ops on the device, reading each model's exact parameters from its Hugging Face config. The inference span fell from about 300 ms to 20 ms per video with identical predictions. Decoding the chosen windows (85 to 166 ms, CPU) is now the largest remaining cost; moving it to NVDEC or reusing the scan's decoder is the next systems step.</p>
 
 <h3>Token sparsity <span class="quiet">(from finding 5)</span></h3>
 <p>Make compute follow the budget inside the transformer by dropping uninformative patches, so a 4-frame budget costs a quarter of a 16-frame budget in model time, not only in decode time.</p>
