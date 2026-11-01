@@ -77,12 +77,14 @@ def main() -> None:
     ap.add_argument("--budgets", type=int, nargs="+", default=[4, 8, 16, 32])
     ap.add_argument("--samplers", nargs="+", default=["uniform", "oracle", "kf-oracle", "kf-clip"])
     ap.add_argument("--window", type=float, default=5.0, help="seconds decoded after each chosen keyframe")
+    ap.add_argument("--device", default=None, help="cuda or cpu (default: cuda if available)")
     ap.add_argument("--motion-stride", type=int, default=4, help="score every k-th frame for motion")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default="results/thumos14.jsonl")
     args = ap.parse_args()
 
-    gpu = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu"
+    device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
+    gpu = torch.cuda.get_device_name(0) if device == "cuda" else f"cpu ({platform.processor() or 'unknown'})"
     ucf = UCF101(args.ucf_root, "train", 1, limit=1)  # only for the class list
     ds = THUMOS14(args.root, "val")
     if args.limit:
@@ -93,8 +95,8 @@ def main() -> None:
     sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     print(gpu, "|", args.backbone, "|", ds, flush=True)
 
-    clip_scorer = ClipScorer(ds.classes) if "kf-clip" in args.samplers else None
-    extractor = HFFeatureExtractor(BACKBONES[args.backbone])
+    clip_scorer = ClipScorer(ds.classes, device=device) if "kf-clip" in args.samplers else None
+    extractor = HFFeatureExtractor(BACKBONES[args.backbone], device=device)
     probe = LinearProbe(extractor, ucf.num_classes, ucf.classes).load_head(args.head)
 
     out = Path(args.out)
