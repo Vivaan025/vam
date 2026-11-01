@@ -109,13 +109,22 @@ class Video:
         idx_t = torch.tensor(got, dtype=torch.long)
         return FrameBatch(arr, idx_t.float() / float(self.fps), idx_t)
 
-    def iter_frames(self, start: int = 0, stop: Optional[int] = None) -> Iterator[tuple[int, np.ndarray]]:
-        """Sequentially decode frames (much faster than random access)."""
+    def iter_frames(self, start: int = 0, stop: Optional[int] = None, step: int = 1) -> Iterator[tuple[int, np.ndarray]]:
+        """Sequentially decode frames (much faster than random access).
+
+        With `step > 1` every frame is still decoded (a P-frame needs its predecessors) but only
+        every `step`-th one is converted to RGB and yielded; the rest cost a bare `grab()`.
+        """
         cap = self._capture()
         cap.set(cv2.CAP_PROP_POS_FRAMES, start)
         idx = start
         stop = self.num_frames if stop is None else min(stop, self.num_frames)
         while idx < stop:
+            if (idx - start) % step:
+                if not cap.grab():
+                    break
+                idx += 1
+                continue
             ok, bgr = cap.read()
             if not ok:
                 break

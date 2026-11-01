@@ -3,9 +3,19 @@
 Stage 1  scan_keyframes()  -> thumbnails + timestamps (~100 ms for a 3-minute file)
 Stage 2  scorer(thumbs)    -> one score per keyframe (semantic: CLIP, oracle, learned ...)
 Stage 3  pick `segments` keyframes by score with temporal non-max suppression, then place the
-         frame budget evenly inside a window of `window_s` seconds *after* each chosen keyframe.
+         frame budget inside a window *after* each chosen keyframe.
          Decoding forward from a keyframe needs no seek, so stage 3 costs one short sequential
          read per segment instead of one seek per frame.
+
+Stage 3 has three knobs (experiment 006):
+  window   "fixed": `window_s` seconds after the keyframe.
+           "gap":   up to the next keyframe, clipped to [min_window_s, window_s].
+  alloc    "equal": budget split evenly, remainder to the best scores.
+           "softmax": proportional to softmax(score / temperature).
+  refine   None: frames spaced evenly inside the window.
+           a scorer: the window is decoded once at thumbnail resolution every `refine_stride`
+           frames, scored, and the frames go to the best-scoring moments. The frames decoded for
+           refinement are kept, so `read()` hands them over without a second decode.
 """
 
 from __future__ import annotations
@@ -24,8 +34,15 @@ Scorer = Callable[[Keyframes], np.ndarray]
 class KeyframeSampler(Sampler):
     def __init__(self, num_frames: int, scorer: Scorer, window_s: float = 5.0,
                  segments: Optional[int] = None, thumb: tuple[int, int] = (112, 112),
-                 scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None):
+                 scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None,
+                 window: str = "fixed", min_window_s: float = 1.0,
+                 alloc: str = "equal", temperature: float = 0.1,
+                 refine: Optional[Scorer] = None, refine_stride: int = 3, keep_edge: int = 224):
         super().__init__(num_frames)
+        if window not in ("fixed", "gap"):
+            raise ValueError(f"window must be 'fixed' or 'gap', got {window!r}")
+        if alloc not in ("equal", "softmax"):
+            raise ValueError(f"alloc must be 'equal' or 'softmax', got {alloc!r}")
         self.scorer = scorer
         self.window_s = window_s
         self.segments = segments or max(1, min(4, num_frames // 2))
@@ -33,9 +50,19 @@ class KeyframeSampler(Sampler):
         self.scan_workers = scan_workers
         self.keyframe_stride = keyframe_stride
         self.scan_backend = scan_backend
+        self.window = window
+        self.min_window_s = min_window_s
+        self.alloc = alloc
+        self.temperature = temperature
+        self.refine = refine
+        self.refine_stride = max(1, int(refine_stride))
+        self.keep_edge = keep_edge
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
         self.last_chosen: list[int] = []
+        self.last_windows: list[tuple[int, int]] = []
+        self.last_refine_ms: float = 0.0
+        self._cache: dict[int, np.ndarray] = {}
 
     def pick_keyframes(self, kf: Keyframes, scores: np.ndarray) -> list[int]:
         """Greedy top-k with temporal NMS: no two chosen keyframes within window_s."""
@@ -49,6 +76,35 @@ class KeyframeSampler(Sampler):
                 break
         return sorted(chosen, key=lambda i: kf.times[i])
 
+    def allocate(self, chosen: list[int], scores: np.ndarray) -> dict[int, int]:
+        """Frames per chosen keyframe, summing to the budget."""
+        n = self.num_frames
+        if self.alloc == "equal" or len(chosen) == 1:
+            base, extra = divmod(n, len(chosen))
+            by_score = sorted(chosen, key=lambda i: -scores[i])
+            return {i: base + (1 if r < extra else 0) for r, i in enumerate(by_score)}
+        z = np.array([scores[i] for i in chosen], dtype=np.float64) / max(self.temperature, 1e-6)
+        p = np.exp(z - z.max())
+        p /= p.sum()
+        k = np.floor(p * n).astype(int)
+        for i in np.argsort(-(p * n - k), kind="stable")[: n - int(k.sum())]:
+            k[i] += 1
+        return {i: int(c) for i, c in zip(chosen, k)}
+
+    def windows(self, kf: Keyframes, chosen: list[int], video: Video) -> list[tuple[int, int]]:
+        """[start, end) frame range decoded after each chosen keyframe."""
+        fps, n = video.fps, video.num_frames
+        out = []
+        for i in chosen:
+            start = int(kf.indices[i])
+            span_s = self.window_s
+            if self.window == "gap" and i + 1 < len(kf):
+                gap = float(kf.times[i + 1] - kf.times[i])
+                span_s = min(self.window_s, max(self.min_window_s, gap))
+            end = min(start + max(1, int(round(span_s * fps))), n)
+            out.append((start, end))
+        return out
+
     def select(self, video: Video) -> list[int]:
         kf = scan_keyframes(video.path, thumb=self.thumb, workers=self.scan_workers, stride=self.keyframe_stride,
                             backend=self.scan_backend)
@@ -56,27 +112,83 @@ class KeyframeSampler(Sampler):
         if scores.shape != (len(kf),):
             raise ValueError(f"scorer returned {scores.shape}, expected ({len(kf)},)")
         chosen = self.pick_keyframes(kf, scores)
-        self.last_keyframes, self.last_scores, self.last_chosen = kf, scores, chosen
+        per = self.allocate(chosen, scores)
+        wins = self.windows(kf, chosen, video)
+        self.last_keyframes, self.last_scores, self.last_chosen, self.last_windows = kf, scores, chosen, wins
+        self._cache = {}
+        self.last_refine_ms = 0.0
 
-        # split the budget across chosen segments, remainder to the best-scored ones
-        m = len(chosen)
-        base, extra = divmod(self.num_frames, m)
-        by_score = sorted(chosen, key=lambda i: -scores[i])
-        per = {i: base + (1 if r < extra else 0) for r, i in enumerate(by_score)}
-
-        fps = video.fps
         n = video.num_frames
         out: list[int] = []
-        for i in chosen:
-            k = per[i]
-            if k <= 0:
+        if self.refine is None:
+            for i, (start, end) in zip(chosen, wins):
+                k = per[i]
+                if k <= 0:
+                    continue
+                offs = (np.arange(k) + 0.5) / k * (end - start)
+                out.extend(int(start + o) for o in offs)
+            return sorted(set(min(i, n - 1) for i in out))
+
+        # coarse-to-fine: decode each window once at stride, score thumbnails, place frames at the peaks
+        import time
+
+        import cv2
+
+        t0 = time.perf_counter()
+        cand_idx: list[int] = []
+        cand_thumb: list[np.ndarray] = []
+        groups: list[tuple[int, int, int]] = []  # (chosen keyframe, first candidate, n candidates)
+        for i, (start, end) in zip(chosen, wins):
+            if per[i] <= 0:
                 continue
-            start = int(kf.indices[i])
-            span = max(1, int(round(self.window_s * fps)))
-            end = min(start + span, n)
-            offs = (np.arange(k) + 0.5) / k * (end - start)
-            out.extend(int(start + o) for o in offs)
-        return sorted(set(min(i, n - 1) for i in out))
+            first = len(cand_idx)
+            for idx, frame in video.iter_frames(start, end, step=self.refine_stride):
+                self._cache[idx] = self._keep(frame, cv2)
+                cand_idx.append(idx)
+                cand_thumb.append(cv2.resize(frame, self.thumb, interpolation=cv2.INTER_AREA))
+            groups.append((i, first, len(cand_idx) - first))
+        if not cand_idx:
+            return []
+        fps = video.fps
+        cands = Keyframes(times=np.asarray(cand_idx, dtype=np.float64) / fps, indices=np.asarray(cand_idx),
+                          thumbs=np.stack(cand_thumb), fps=fps, duration=video.duration, num_frames=n)
+        fine = np.asarray(self.refine(cands), dtype=np.float64)
+        self.last_fine = (cands, fine)
+        for i, first, m in groups:
+            k = min(per[i], m)
+            s = fine[first:first + m]
+            spacing = max(1, m // (2 * k))  # keep the k picks from piling onto one peak
+            picked: list[int] = []
+            for j in np.argsort(-s, kind="stable"):
+                if all(abs(int(j) - q) >= spacing for q in picked):
+                    picked.append(int(j))
+                if len(picked) >= k:
+                    break
+            out.extend(cand_idx[first + j] for j in picked)
+        self.last_refine_ms = (time.perf_counter() - t0) * 1000.0
+        return sorted(set(out))
+
+    def _keep(self, frame: np.ndarray, cv2) -> np.ndarray:
+        """Store a decoded frame for read(): downscaled so its shortest edge is keep_edge (the model
+        crops at 224 anyway), so a cache of a few hundred frames stays small even for 1080p input."""
+        h, w = frame.shape[:2]
+        e = min(h, w)
+        if self.keep_edge and e > self.keep_edge:
+            r = self.keep_edge / e
+            frame = cv2.resize(frame, (max(1, round(w * r)), max(1, round(h * r))), interpolation=cv2.INTER_AREA)
+        return frame
+
+    def read(self, video: Video, indices: list[int]):
+        if indices and all(i in self._cache for i in indices):
+            import torch
+
+            from vam.core import FrameBatch
+
+            idx = sorted(set(int(i) for i in indices))
+            arr = torch.from_numpy(np.stack([self._cache[i] for i in idx]))
+            idx_t = torch.tensor(idx, dtype=torch.long)
+            return FrameBatch(arr, idx_t.float() / float(video.fps), idx_t)
+        return video.read(indices)
 
 
 # ---- scorers -------------------------------------------------------------------------------

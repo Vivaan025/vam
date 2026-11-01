@@ -22,8 +22,13 @@ class Sampler(ABC):
     def select(self, video: Video) -> list[int]:
         """Return sorted frame indices to decode and process."""
 
+    def read(self, video: Video, indices: list[int]) -> FrameBatch:
+        """Decode the selected frames. Samplers that already decoded them while selecting
+        (e.g. a refinement pass over a window) override this to hand them over instead."""
+        return video.read(indices)
+
     def __call__(self, video: Video) -> FrameBatch:
-        return video.read(self.select(video))
+        return self.read(video, self.select(video))
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}(num_frames={self.num_frames})"

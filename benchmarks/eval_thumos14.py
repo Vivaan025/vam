@@ -82,6 +82,12 @@ def main() -> None:
     ap.add_argument("--scan-backend", default=None, choices=["process", "thread", "serial"],
                     help="default: process where fork is available, else thread")
     ap.add_argument("--kf-stride", type=int, default=1, help="keep every k-th keyframe in the scan")
+    ap.add_argument("--kf-window", default="fixed", choices=["fixed", "gap"], help="window after a keyframe (006)")
+    ap.add_argument("--kf-alloc", default="equal", choices=["equal", "softmax"], help="budget split across keyframes (006)")
+    ap.add_argument("--kf-temp", type=float, default=0.1, help="softmax temperature for --kf-alloc softmax")
+    ap.add_argument("--kf-refine", action="store_true", help="coarse-to-fine: score window thumbnails, place frames at peaks (006)")
+    ap.add_argument("--kf-refine-stride", type=int, default=3, help="candidate every k-th frame inside a window")
+    ap.add_argument("--tag", default="", help="suffix appended to kf-* sampler names in the log, e.g. ':gap+softmax'")
     ap.add_argument("--motion-stride", type=int, default=4, help="score every k-th frame for motion")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default="results/thumos14.jsonl")
@@ -102,6 +108,9 @@ def main() -> None:
     clip_scorer = ClipScorer(ds.classes, device=device) if "kf-clip" in args.samplers else None
     extractor = HFFeatureExtractor(BACKBONES[args.backbone], device=device)
     probe = LinearProbe(extractor, ucf.num_classes, ucf.classes).load_head(args.head)
+
+    kf_opts = dict(window=args.kf_window, alloc=args.kf_alloc, temperature=args.kf_temp,
+                   refine_stride=args.kf_refine_stride)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -125,13 +134,16 @@ def main() -> None:
                         sampler = OracleSampler(budget, uv)
                     elif sname == "kf-oracle":
                         segs = [(s.start, s.end) for s in uv.segments]
+                        # refinement with the oracle scores each candidate frame by overlap of a short window
+                        fine = OracleKeyframeScorer(segs, 0.2) if args.kf_refine else None
                         sampler = KeyframeSampler(budget, OracleKeyframeScorer(segs, args.window), window_s=args.window,
                                                   scan_workers=args.scan_workers, keyframe_stride=args.kf_stride,
-                                                  scan_backend=args.scan_backend)
+                                                  scan_backend=args.scan_backend, refine=fine, **kf_opts)
                     elif sname == "kf-clip":
                         sampler = KeyframeSampler(budget, clip_scorer, window_s=args.window,
                                                   scan_workers=args.scan_workers, keyframe_stride=args.kf_stride,
-                                                  scan_backend=args.scan_backend)
+                                                  scan_backend=args.scan_backend,
+                                                  refine=clip_scorer if args.kf_refine else None, **kf_opts)
                     else:
                         raise SystemExit(f"unknown sampler {sname}")
                     p = vam.Profiler()
@@ -139,7 +151,7 @@ def main() -> None:
                         with p.span("select"):
                             idx = sampler.select(v)
                         with p.span("decode"):
-                            batch = v.read(idx)
+                            batch = sampler.read(v, idx)
                         with p.span("infer"):
                             o = probe(batch)
                     except Exception as e:
@@ -155,16 +167,18 @@ def main() -> None:
                     correct += ok
                     hit_sum += hit
                     n += 1
+                    logged = sname + (args.tag if sname.startswith("kf-") else "")
                     f.write(json.dumps({
                         "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone,
-                        "sampler": sname, "budget": budget, "video": uv.video_id, "duration_s": duration,
+                        "sampler": logged, "budget": budget,
+                        "refine_ms": getattr(sampler, "last_refine_ms", 0.0), "video": uv.video_id, "duration_s": duration,
                         "num_frames": nf, "action_fraction": uv.action_fraction(duration),
                         "labels": sorted(uv.classes), "pred": pred_cls, "correct": bool(ok), "hit_rate": hit,
                         **{f"{k}_ms": s["wall_ms"] for k, s in p.as_dict().items()},
                         "infer_peak_mb": p.as_dict()["infer"]["peak_mb"],
                     }) + "\n")
                 f.flush()
-                print(f"{sname:8s} budget={budget:3d}  top1={correct / max(n, 1):.3f}  "
+                print(f"{sname + (args.tag if sname.startswith('kf-') else ''):20s} budget={budget:3d}  top1={correct / max(n, 1):.3f}  "
                       f"hit={hit_sum / max(n, 1):.2f}  n={n}  "
                       f"{(time.time() - t_start) / max(n, 1) * 1000:.0f} ms/video", flush=True)
 
