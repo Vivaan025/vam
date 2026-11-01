@@ -23,12 +23,16 @@ Scorer = Callable[[Keyframes], np.ndarray]
 
 class KeyframeSampler(Sampler):
     def __init__(self, num_frames: int, scorer: Scorer, window_s: float = 5.0,
-                 segments: Optional[int] = None, thumb: tuple[int, int] = (112, 112)):
+                 segments: Optional[int] = None, thumb: tuple[int, int] = (112, 112),
+                 scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None):
         super().__init__(num_frames)
         self.scorer = scorer
         self.window_s = window_s
         self.segments = segments or max(1, min(4, num_frames // 2))
         self.thumb = thumb
+        self.scan_workers = scan_workers
+        self.keyframe_stride = keyframe_stride
+        self.scan_backend = scan_backend
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
         self.last_chosen: list[int] = []
@@ -46,7 +50,8 @@ class KeyframeSampler(Sampler):
         return sorted(chosen, key=lambda i: kf.times[i])
 
     def select(self, video: Video) -> list[int]:
-        kf = scan_keyframes(video.path, thumb=self.thumb)
+        kf = scan_keyframes(video.path, thumb=self.thumb, workers=self.scan_workers, stride=self.keyframe_stride,
+                            backend=self.scan_backend)
         scores = np.asarray(self.scorer(kf), dtype=np.float64)
         if scores.shape != (len(kf),):
             raise ValueError(f"scorer returned {scores.shape}, expected ({len(kf)},)")

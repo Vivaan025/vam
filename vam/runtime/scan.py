@@ -32,33 +32,117 @@ class Keyframes:
         return int(self.times.shape[0])
 
 
-def scan_keyframes(path: str, thumb: tuple[int, int] = (112, 112), max_keyframes: int | None = None) -> Keyframes:
-    """Decode only keyframes and return low-res thumbnails with their timestamps.
+def _scan_range(path: str, t0: float, t1: float, thumb: tuple[int, int], stride: int) -> list[tuple[float, np.ndarray]]:
+    """Decode keyframes with t0 <= t < t1 (seconds). One container per worker, single codec thread."""
+    import av
 
-    thumb: (width, height) of the thumbnails. Conversion dominates scan time, so keep it small.
-    """
-    import av  # optional dependency, imported lazily
-
+    out: list[tuple[float, np.ndarray]] = []
     with av.open(path) as c:
         s = c.streams.video[0]
         s.codec_context.skip_frame = "NONKEY"
-        s.thread_type = "AUTO"
+        s.codec_context.thread_count = 1  # several workers; ffmpeg's own pool would thrash
+        tb = float(s.time_base)
+        if t0 > 0:
+            c.seek(int(t0 / tb), stream=s, backward=True, any_frame=False)
+        k = 0
+        for f in c.decode(s):
+            if f.pts is None:
+                continue
+            t = f.pts * tb
+            if t < t0:
+                continue
+            if t >= t1:
+                break
+            if k % stride == 0:
+                out.append((t, f.to_ndarray(format="rgb24", width=thumb[0], height=thumb[1])))
+            k += 1
+    return out
+
+
+_POOL = None
+_POOL_SIZE = 0
+
+
+def _process_pool(workers: int):
+    """A persistent process pool (fork on Linux). Created lazily; grown if more workers are asked for."""
+    global _POOL, _POOL_SIZE
+    if _POOL is None or _POOL_SIZE < workers:
+        import atexit
+        import multiprocessing as mp
+        from concurrent.futures import ProcessPoolExecutor
+
+        if _POOL is not None:
+            _POOL.shutdown(wait=False)
+        ctx = mp.get_context("fork") if "fork" in mp.get_all_start_methods() else mp.get_context("spawn")
+        _POOL = ProcessPoolExecutor(workers, mp_context=ctx)
+        _POOL_SIZE = workers
+        atexit.register(_POOL.shutdown, wait=False)
+    return _POOL
+
+
+def default_scan_workers() -> int:
+    import os
+
+    return max(1, min(8, (os.cpu_count() or 2) - 1))
+
+
+def default_scan_backend() -> str:
+    """Processes where they can fork (Linux/macOS): workers inherit the loaded modules for free.
+    Threads elsewhere: spawned workers would each re-import torch/cv2, which costs seconds and memory."""
+    import multiprocessing as mp
+
+    return "process" if "fork" in mp.get_all_start_methods() else "thread"
+
+
+def scan_keyframes(path: str, thumb: tuple[int, int] = (112, 112), max_keyframes: int | None = None,
+                   workers: int | None = None, stride: int = 1, backend: str | None = None) -> Keyframes:
+    """Decode only keyframes and return low-res thumbnails with their timestamps.
+
+    thumb:   (width, height) of the thumbnails.
+    workers: the timeline is split into this many ranges scanned in parallel (default: cpu_count-1,
+             at most 8). Software keyframe decode costs ~1.5 ms each and the per-frame Python work holds
+             the GIL, so threads stop scaling at ~4 workers while processes scale to 8 (experiment 005:
+             242 -> 44 ms on a 98-keyframe video; 6x throughput across videos).
+    stride:  keep every stride-th keyframe (within each worker's range). Cheaper scan, coarser scan.
+    backend: "process" (default where fork is available), "thread" (default elsewhere), or "serial".
+    """
+    import av
+
+    with av.open(path) as c:
+        s = c.streams.video[0]
         tb = float(s.time_base)
         fps = float(s.average_rate) if s.average_rate else 30.0
         duration = float(s.duration * tb) if s.duration else 0.0
         num_frames = int(s.frames) if s.frames else int(round(duration * fps))
-        times, thumbs = [], []
-        for f in c.decode(s):
-            if f.pts is None:
-                continue
-            times.append(f.pts * tb)
-            thumbs.append(f.to_ndarray(format="rgb24", width=thumb[0], height=thumb[1]))
-            if max_keyframes and len(times) >= max_keyframes:
-                break
-    if not times:
+
+    workers = default_scan_workers() if workers is None else max(1, int(workers))
+    backend = backend or default_scan_backend()
+    if duration <= 0 or workers == 1 or backend == "serial":
+        parts = [_scan_range(path, 0.0, float("inf"), thumb, stride)]
+    else:
+        edges = np.linspace(0.0, duration + 1.0, workers + 1)
+        jobs = [(path, float(edges[i]), float(edges[i + 1]), thumb, stride) for i in range(workers)]
+        if backend == "process":
+            parts = list(_process_pool(workers).map(_scan_range_job, jobs))
+        elif backend == "thread":
+            from concurrent.futures import ThreadPoolExecutor
+
+            with ThreadPoolExecutor(workers) as ex:
+                parts = list(ex.map(_scan_range_job, jobs))
+        else:
+            raise ValueError(f"unknown backend {backend!r}")
+    items = sorted((x for part in parts for x in part), key=lambda x: x[0])
+    if max_keyframes:
+        items = items[:max_keyframes]
+    if not items:
         raise ValueError(f"no keyframes decoded from {path}")
-    t = np.asarray(times, dtype=np.float64)
+    t = np.asarray([x[0] for x in items], dtype=np.float64)
+    thumbs = np.stack([x[1] for x in items])
     if duration <= 0:
         duration = float(t[-1])
     idx = np.clip(np.round(t * fps).astype(np.int64), 0, max(num_frames - 1, 0))
-    return Keyframes(t, idx, np.stack(thumbs), fps, duration, num_frames)
+    return Keyframes(t, idx, thumbs, fps, duration, num_frames)
+
+
+def _scan_range_job(job):
+    return _scan_range(*job)

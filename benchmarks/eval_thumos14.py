@@ -78,6 +78,10 @@ def main() -> None:
     ap.add_argument("--samplers", nargs="+", default=["uniform", "oracle", "kf-oracle", "kf-clip"])
     ap.add_argument("--window", type=float, default=5.0, help="seconds decoded after each chosen keyframe")
     ap.add_argument("--device", default=None, help="cuda or cpu (default: cuda if available)")
+    ap.add_argument("--scan-workers", type=int, default=None, help="parallel time ranges for the keyframe scan (default cpu-1, max 8)")
+    ap.add_argument("--scan-backend", default=None, choices=["process", "thread", "serial"],
+                    help="default: process where fork is available, else thread")
+    ap.add_argument("--kf-stride", type=int, default=1, help="keep every k-th keyframe in the scan")
     ap.add_argument("--motion-stride", type=int, default=4, help="score every k-th frame for motion")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default="results/thumos14.jsonl")
@@ -121,9 +125,13 @@ def main() -> None:
                         sampler = OracleSampler(budget, uv)
                     elif sname == "kf-oracle":
                         segs = [(s.start, s.end) for s in uv.segments]
-                        sampler = KeyframeSampler(budget, OracleKeyframeScorer(segs, args.window), window_s=args.window)
+                        sampler = KeyframeSampler(budget, OracleKeyframeScorer(segs, args.window), window_s=args.window,
+                                                  scan_workers=args.scan_workers, keyframe_stride=args.kf_stride,
+                                                  scan_backend=args.scan_backend)
                     elif sname == "kf-clip":
-                        sampler = KeyframeSampler(budget, clip_scorer, window_s=args.window)
+                        sampler = KeyframeSampler(budget, clip_scorer, window_s=args.window,
+                                                  scan_workers=args.scan_workers, keyframe_stride=args.kf_stride,
+                                                  scan_backend=args.scan_backend)
                     else:
                         raise SystemExit(f"unknown sampler {sname}")
                     p = vam.Profiler()

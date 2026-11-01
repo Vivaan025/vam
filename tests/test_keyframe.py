@@ -78,3 +78,24 @@ def test_sequential_read_matches_seek_read(h264_video):
     assert a.indices.tolist() == b.indices.tolist() == idx
     assert (a.frames == b.frames).all()
     v.close()
+
+
+@pytest.mark.parametrize("backend", ["thread", "process"])
+def test_parallel_scan_matches_single(h264_video, backend):
+    import multiprocessing as mp
+
+    if backend == "process" and "fork" not in mp.get_all_start_methods():
+        pytest.skip("process backend needs fork (workers would re-import torch/cv2 under spawn)")
+    path, fps, n = h264_video
+    a = scan_keyframes(path, thumb=(32, 24), workers=1, backend="serial")
+    b = scan_keyframes(path, thumb=(32, 24), workers=4, backend=backend)
+    assert np.allclose(a.times, b.times)
+    assert (a.thumbs == b.thumbs).all()
+
+
+def test_keyframe_stride_halves(h264_video):
+    path, fps, n = h264_video
+    a = scan_keyframes(path, thumb=(32, 24), workers=1)
+    b = scan_keyframes(path, thumb=(32, 24), workers=1, stride=2)
+    assert len(b) == (len(a) + 1) // 2
+    assert np.allclose(b.times, a.times[::2])

@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-01 | Process-parallel keyframe scan (`workers`, `stride`, `backend`), persistent pool; sampler and benchmark flags | `vam/runtime/scan.py`, `vam/sampling/keyframe.py`, `benchmarks/eval_thumos14.py` | [005](experiments/005-cheaper-keyframe-scan.md) |
 | 2026-11-01 | Plan for experiment 005 (cheaper keyframe scan) | `docs/experiments/005-cheaper-keyframe-scan.md` | [005](experiments/005-cheaper-keyframe-scan.md) |
 | 2026-11-01 | Results of experiment 004 | `docs/results/thumos14_preprocess.md` | [004](experiments/004-gpu-preprocessing.md) |
 | 2026-11-01 | `vam.runtime.preprocess.Preprocessor`: device-side resize/crop/normalise read from the HF processor config; used by `HFVideoClassifier`, `HFFeatureExtractor` and `ClipScorer` (`use_hf_processor=True` keeps the old path); tolerance tests vs both HF processors | `vam/runtime/preprocess.py`, `vam/models/hf.py`, `vam/models/probe.py`, `vam/sampling/keyframe.py` | [004](experiments/004-gpu-preprocessing.md) |
