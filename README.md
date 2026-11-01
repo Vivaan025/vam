@@ -42,7 +42,7 @@ Three rules keep this a library rather than a model zoo:
    agent policies fill `actions`. Everything above the model works for both.
 3. **PyTorch is the backend.** Custom kernels only replace an op after profiling proves it matters.
 
-## Status: v0.1 (Phase 1 of the roadmap)
+## Status: v0.2 (Phase 2 of the roadmap) · see `docs/experiments/` for the log
 
 - [x] `Video` with lazy decoding, `FrameBatch`, `ActionOutput`
 - [x] `UniformSampler`, `MotionSampler`
@@ -53,8 +53,11 @@ Three rules keep this a library rather than a model zoo:
 - [x] UCF101 dataset + linear-probe evaluation: accuracy vs frame budget vs latency
       (`docs/results/ucf101_phase1.md`)
 - [x] THUMOS14 untrimmed long-video benchmark with oracle upper bound and hit-rate metric
-- [ ] GPU decode (NVDEC) + GPU preprocessing; one decode pass shared by scorer and model
-- [ ] Adaptive frame scheduler (research contribution)
+- [x] Keyframe-scan two-stage sampler with oracle / CLIP scorers (`docs/results/thumos14_keyframe.md`)
+- [x] Device-side tensor preprocessing (`docs/results/thumos14_preprocess.md`): kf-clip-16 beats
+      uniform-16 by +5.5 pts top-1 at 33% less latency on THUMOS14
+- [ ] Cheaper keyframe scan; GPU decode (NVDEC)
+- [ ] Adaptive window + learned scorer (research contribution)
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline
 - [ ] Policy / VLA adapter (video-to-action)
