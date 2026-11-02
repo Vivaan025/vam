@@ -42,7 +42,16 @@ Three rules keep this a library rather than a model zoo:
    agent policies fill `actions`. Everything above the model works for both.
 3. **PyTorch is the backend.** Custom kernels only replace an op after profiling proves it matters.
 
-## Status: v0.2 (Phase 2 of the roadmap) · see `docs/experiments/` for the log
+## Status: v0.3 · see `docs/experiments/` for the log and `docs/roadmap.md` for the path to v0.1 on PyPI
+
+On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear probe fitted on UCF101):
+
+| policy | 4 frames | 8 frames | 16 frames |
+|---|---|---|---|
+| uniform sampling | 0.720 @ 147 ms | 0.795 @ 277 ms | 0.880 @ 486 ms |
+| **vam** (keyframe scan + learned scorer + refinement) | **0.865 @ 143 ms** | **0.925 @ 153 ms** | **0.940 @ 152 ms** |
+| oracle (sees the annotations) | 0.890 | 0.925 | 0.955 |
+
 
 - [x] `Video` with lazy decoding, `FrameBatch`, `ActionOutput`
 - [x] `UniformSampler`, `MotionSampler`
@@ -55,10 +64,14 @@ Three rules keep this a library rather than a model zoo:
 - [x] THUMOS14 untrimmed long-video benchmark with oracle upper bound and hit-rate metric
 - [x] Keyframe-scan two-stage sampler with oracle / CLIP scorers (`docs/results/thumos14_keyframe.md`)
 - [x] Device-side tensor preprocessing (`docs/results/thumos14_preprocess.md`)
-- [x] Process-parallel keyframe scan (`docs/results/thumos14_scan.md`): on THUMOS14 kf-clip beats
-      uniform at 16 frames by +5.5 pts top-1 at 2.3× lower latency (210 vs 486 ms/video)
-- [ ] GPU / PyAV windowed decode (NVDEC)
-- [ ] Adaptive window + learned scorer (research contribution)
+- [x] Process-parallel keyframe scan (`docs/results/thumos14_scan.md`)
+- [x] Gap window, score-proportional allocation, coarse-to-fine refinement inside windows
+      (`docs/results/thumos14_adaptive.md`)
+- [x] Parallel windowed decode: latency flat at ~150 ms for any budget (`docs/results/thumos14_pdecode.md`)
+- [x] Learned, class-free keyframe scorer: equals the oracle at 8 frames (`docs/results/thumos14_learned.md`)
+- [ ] Millisecond-budget scheduler (research contribution)
+- [ ] Generality: second dataset, 1080p, other codecs; robustness; packaging (see `docs/roadmap.md`)
+- [ ] GPU windowed decode (NVDEC) — deferred past v0.1
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline
 - [ ] Policy / VLA adapter (video-to-action)

@@ -1,6 +1,6 @@
 # 009 · Learned keyframe scorer
 
-**Date:** 2026-11-02 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-02 · **Status:** done · **Results:** [`docs/results/thumos14_learned.md`](../results/thumos14_learned.md)
 
 (008, NVDEC decode, is deferred: the decode stage is a ~90 ms seek floor already below uniform sampling's
 latency, and hardware decode adds an install burden. Numbering is kept so the plan in 007 stays true.)
@@ -52,8 +52,29 @@ uses the zero-shot score.
 - CLIP embeddings of 112² thumbnails may lack the detail to tell a warm-up from the action; if Spearman stalls
   below ~0.5, try 224² thumbnails for the scorer only (scan cost +10 ms, 005 showed conversion is cheap).
 
+## Changes made
+- `vam/sampling/learned.py`: `gap_window_targets` (oracle score under the gap-window rule), `build_features`
+  (own embedding, ±context neighbours zero-padded, gap, optional zero-shot score), `ScorerHead` (ridge or MLP),
+  `LearnedScorer` (CLIP embed → per-fold heads; `for_video(id)` picks the unseen fold, unknown videos get the
+  fold average). `ClipScorer.embed` / `scores_from_embedding` so both scorers share one CLIP forward.
+- `scripts/train_scorer.py`: caches features for all 200 videos (~1 min), 5-fold CV by video, MSE + within-video
+  pairwise ranking loss, early stopping on held-out Spearman, prints zero-shot and oracle references, saves heads
+  + fold map. `eval_thumos14.py --samplers kf-learned --scorer-head <ckpt>`.
+- Test: target rule, feature layout, fold selection with a fake embedder.
+
 ## Results
-*(to fill)*
+- Scorer-level (held-out): context head top-2 precision 0.732 vs zero-shot 0.603; chosen-window overlap 0.546
+  vs 0.435 (oracle 0.883). The zero-shot score as an extra input adds nothing → class-free.
+- End to end with refinement (stride 6, fp16, threads): **context head 0.865 / 0.925 / 0.940 at 143 / 153 /
+  152 ms** (kf-clip 0.850 / 0.895 / 0.930 at 146 / 152 / 151; oracle 0.890 / 0.925 / 0.955). Ridge head 0.875 /
+  0.915 / 0.955. Hit rate 0.44 → 0.53 at 4 frames. Select is 6–8 ms cheaper than zero-shot.
+- Hypothesis check: kf-learned-8 ≥ 0.91 ✔ (0.925); kf-learned-4 ≥ 0.87 ✔ with ridge (0.875), 0.865 with context
+  (within noise); latency ✔; class-free ✔.
 
 ## Decision
-*(to fill)*
+- `LearnedScorer` with the context head (class-free) is the recommended scorer; `ClipScorer` stays as the
+  zero-shot fallback when no head is available. The checkpoint `results/cache/scorer_context_nozs.pt` is
+  cross-validated on THUMOS14 val only; shipping a head trained on all 200 videos for other footage is roadmap
+  item R3 (generality), which must come with a second dataset to measure it on.
+- At 8 frames the runtime now equals the oracle; at 4 and 16 it is 2.5 and 1.5 points short. The scorer is no
+  longer the main lever on this dataset. Next: the millisecond-budget scheduler (R2), then generality (R3).
