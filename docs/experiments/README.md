@@ -15,3 +15,4 @@ Raw numbers live in `docs/results/`; this log is the reasoning trail.
 | 007 | 2026-11-02 | [Parallel windowed decode](007-parallel-window-decode.md) | done | decode flat at ~90 ms for any budget; refinement affordable: 0.850 / 0.895 / 0.930 at 4 / 8 / 16 frames in ~150 ms (uniform 0.720 / 0.795 / 0.880 in 147 / 277 / 486) |
 | 008 | – | NVDEC decode | deferred | see `docs/roadmap.md` |
 | 009 | 2026-11-02 | [Learned keyframe scorer](009-learned-scorer.md) | done | class-free context head: 0.865 / 0.925 / 0.940 at 4 / 8 / 16 frames in ~150 ms (oracle 0.890 / 0.925 / 0.955); equals the oracle at 8 |
+| 010 | 2026-11-02 | [Millisecond-budget scheduler](010-ms-budget-scheduler.md) | planned | |
