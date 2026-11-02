@@ -25,11 +25,11 @@ for chunk in vam.Stream(0, window=16, hop=8):   # webcam
 ```
          vam API            Video · FrameBatch · ActionOutput · Stream
       ───────────────
-         Samplers           Uniform · Motion · (Adaptive, learned: research)
+         Samplers           Uniform · Motion · Keyframe (learned scorer)
       ───────────────
        Model adapters       Hugging Face video classifiers · (policies / VLAs: next)
       ───────────────
-         Runtime            Profiler · FeatureCache · (async pipeline, scheduler: research)
+         Runtime            Profiler · FeatureCache · Scheduler · (async pipeline: next)
       ───────────────
       PyTorch / CUDA        backend, never reimplemented
 ```
@@ -42,7 +42,7 @@ Three rules keep this a library rather than a model zoo:
    agent policies fill `actions`. Everything above the model works for both.
 3. **PyTorch is the backend.** Custom kernels only replace an op after profiling proves it matters.
 
-## Status: v0.3 · see `docs/experiments/` for the log and `docs/roadmap.md` for the path to v0.1 on PyPI
+## Status: v0.4 · see `docs/experiments/` for the log and `docs/roadmap.md` for the path to v0.1 on PyPI
 
 On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear probe fitted on UCF101):
 
@@ -51,6 +51,10 @@ On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear prob
 | uniform sampling | 0.720 @ 147 ms | 0.795 @ 277 ms | 0.880 @ 486 ms |
 | **vam** (keyframe scan + learned scorer + refinement) | **0.865 @ 143 ms** | **0.925 @ 153 ms** | **0.940 @ 152 ms** |
 | oracle (sees the annotations) | 0.890 | 0.925 | 0.955 |
+
+Given a budget in **milliseconds** instead of frames, the scheduler calibrates a cost model on the machine in
+6 s and picks frames, refinement and stride itself: 0.855 at 100 ms, 0.910 at 150, 0.945 at 200 and above
+(`docs/results/thumos14_scheduler.md`). On a CPU-only host it picks different configurations at every budget.
 
 
 - [x] `Video` with lazy decoding, `FrameBatch`, `ActionOutput`
@@ -69,7 +73,7 @@ On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear prob
       (`docs/results/thumos14_adaptive.md`)
 - [x] Parallel windowed decode: latency flat at ~150 ms for any budget (`docs/results/thumos14_pdecode.md`)
 - [x] Learned, class-free keyframe scorer: equals the oracle at 8 frames (`docs/results/thumos14_learned.md`)
-- [ ] Millisecond-budget scheduler (research contribution)
+- [x] Millisecond-budget scheduler: calibrated cost model + pre/post-scan policy (`docs/results/thumos14_scheduler.md`)
 - [ ] Generality: second dataset, 1080p, other codecs; robustness; packaging (see `docs/roadmap.md`)
 - [ ] GPU windowed decode (NVDEC) — deferred past v0.1
 - [ ] Feature reuse in the model forward path

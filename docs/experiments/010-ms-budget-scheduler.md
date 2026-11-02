@@ -1,6 +1,6 @@
 # 010 · Millisecond-budget scheduler
 
-**Date:** 2026-11-02 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-02 · **Status:** done · **Results:** [`docs/results/thumos14_scheduler.md`](../results/thumos14_scheduler.md)
 
 ## Motivation (from 007 and 009)
 The runtime has five measured knobs: frame budget (4 / 8 / 16), number of windows, refinement on/off,
@@ -57,8 +57,35 @@ the chosen configurations visibly different from the 5090's.
   and that is what the policy uses. Document this.
 - Growing per video after the scan can thrash; limit to one re-solve per video.
 
+## Changes made
+- `vam/runtime/scheduler.py`: `Config` / `ACCURACY` (measured ordering), `Features` + `features_for`, `CostModel`
+  (linear in K, longest window, refinement candidates, frames, refinement flag; non-negative least squares on the
+  median of repeated rows; p75 residual as safety margin), `calibrate` (warm-up pass discarded, 3 videos × 4
+  configurations × repeats, cached per GPU + CPU key under `$VAM_CACHE`), `Scheduler` (`pre_plan` from duration,
+  `post_plan` from the scan, `planner()` callback). `KeyframeSampler(planner=)` applies the post-scan plan.
+- `benchmarks/eval_scheduler.py`; tests for the fit, the policy, the cache, the planner hook and a one-off stall.
+
 ## Results
-*(to fill)*
+- GPU, 200 videos: **0.855 / 0.855 / 0.910 / 0.945 / 0.945 at budgets 100 / 125 / 150 / 200 / 300 ms**, realised
+  p50 123 / 124 / 132 / 156 / 158 ms. Uniform at those budgets: 0.720 up to 200, 0.795 at 300. Hindsight-best
+  static: 0.855 / 0.855 / 0.935 / 0.940 / 0.940. The scheduler picks 4f at the bottom, 8f at 150 and
+  16f+refine/3 from 200 up, without being told frames or strides.
+- Within-budget 0.24 / 0.51 / 0.63 / 0.81 / 0.99; p90 180–217 ms. Per-video jitter on the shared host is 55–60
+  ms for every configuration, static ones included, so the ≥ 90 % target is only met at 300 ms by anyone.
+- Cost model: fitted in 6 s; conservative by 11–16 ms; MAE 36–38 ms (jitter, not bias). The 150 ms loss of 2.5
+  points is this conservatism in a band where configurations differ by a few ms of true cost. `--margin 1.1`
+  makes it worse (0.875).
+- CPU slow tier (40 videos): coefficients 4–50× the GPU's; chooses 16f without refinement at 1 s and refinement
+  at 2–4 s; nothing from the 5090 table is replayed.
+- The first pass used naive least squares on 12 rows and fitted a 282 ms intercept with zero slopes, which made
+  the scheduler pick 4f up to 150 ms. Fixed before the reported run (median of repeats, NNLS, warm-up pass).
 
 ## Decision
-*(to fill)*
+- `vam.runtime.Scheduler` is the budget-facing entry point; `calibrate` runs once per machine. Margin stays 1.0:
+  the p75-residual term already makes predictions conservative, and extra margin costs accuracy in the flat
+  125–160 ms band.
+- Hypothesis partly confirmed: within 1 point of hindsight at four of five budgets, slow tier adapts, but the
+  within-budget and prediction-error targets were set for a quiet machine and this host is not one. Report p50
+  and p90 and the hindsight comparison; do not promise a within-budget rate without stating the host's jitter.
+- Open: a per-file decode-cost feature (container seek cost) would cut the jitter the model cannot see; and the
+  accuracy table is THUMOS14-only, so R3 (generality) is next.

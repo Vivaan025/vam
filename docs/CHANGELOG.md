@@ -4,6 +4,8 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-03 | Results of experiment 010: scheduler walks the frontier from a ms budget alone (0.855 → 0.910 → 0.945 at 100 / 150 / 200 ms), CPU tier adapts; README v0.4 | `docs/results/thumos14_scheduler.md`, `README.md`, `docs/study_guide.html` | [010](experiments/010-ms-budget-scheduler.md) |
+| 2026-11-02 | Scheduler calibration made robust to one-off stalls: median of repeated rows, non-negative least squares, discarded warm-up pass, `--calib-repeats`; test | `vam/runtime/scheduler.py`, `benchmarks/eval_scheduler.py`, `tests/test_scheduler.py` | [010](experiments/010-ms-budget-scheduler.md) |
 | 2026-11-02 | `vam.runtime.scheduler`: `CostModel` (linear per-stage latency model, `calibrate` with per-machine cache), `Scheduler` (pre-scan and post-scan plan under a ms budget), `Config`/`ACCURACY` table; `KeyframeSampler(planner=)` hook; `benchmarks/eval_scheduler.py`; tests (shared fixture moved to `conftest.py`) | `vam/runtime/scheduler.py`, `vam/sampling/keyframe.py`, `benchmarks/eval_scheduler.py`, `tests/` | [010](experiments/010-ms-budget-scheduler.md) |
 | 2026-11-02 | Plan for experiment 010 (millisecond-budget scheduler, roadmap R2) | `docs/experiments/010-ms-budget-scheduler.md` | [010](experiments/010-ms-budget-scheduler.md) |
 | 2026-11-02 | Results of experiment 009: class-free learned scorer recommended; README status refreshed | `docs/results/thumos14_learned.md`, `README.md` | [009](experiments/009-learned-scorer.md) |
