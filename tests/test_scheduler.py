@@ -57,7 +57,7 @@ def test_calibrate_uses_runner_and_cache(tmp_path, monkeypatch):
 
     m1 = calibrate([0, 1, 2], run)
     n = len(calls)
-    assert n == 1 + 3 * 4 and m1.n_fit == 12
+    assert n == 4 + 2 * 3 * 4 and m1.n_fit == 24
     m2 = calibrate([0, 1, 2], run)
     assert len(calls) == n and np.allclose(m1.w, m2.w)
 
@@ -78,3 +78,13 @@ def test_planner_hook_changes_sampler_budget(h264_video):
     idx = s.select(v)
     assert seen["K"] > 0 and len(idx) == 6 and s.num_frames == 6
     v.close()
+
+
+def test_cost_model_fit_ignores_one_off_stall():
+    rows = _rows()
+    f0, ms0 = rows[0]
+    rows.append((f0, ms0 + 400))  # the same configuration measured once more, with a stall
+    m = CostModel.fit(rows)
+    f = features_for(Config(8, True, 6), 50, [150, 150, 150, 150])
+    assert abs(m.predict(f) - _true_ms(f)) < 20
+    assert (m.w >= 0).all() and m.resid_p75 >= 0

@@ -43,6 +43,7 @@ def main() -> None:
     ap.add_argument("--device", default=None)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--calib-videos", type=int, default=3)
+    ap.add_argument("--calib-repeats", type=int, default=2)
     ap.add_argument("--no-cache", action="store_true", help="re-fit the cost model instead of using the cached one")
     ap.add_argument("--out", default="results/thumos14_scheduler.jsonl")
     args = ap.parse_args()
@@ -90,7 +91,7 @@ def main() -> None:
             v.close()
 
     t0 = time.time()
-    cost = calibrate(ds.videos[: args.calib_videos], calib_run, cache=not args.no_cache)
+    cost = calibrate(ds.videos[: args.calib_videos], calib_run, cache=not args.no_cache, repeats=args.calib_repeats)
     print(f"cost model ({cost.n_fit} rows, {time.time() - t0:.1f} s): w={np.round(cost.w, 3).tolist()} "
           f"p75 resid={cost.resid_p75:.1f} typical K={cost.typical_K:.0f} window={cost.typical_window:.0f}", flush=True)
 

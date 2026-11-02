@@ -88,17 +88,23 @@ class CostModel:
 
     @classmethod
     def fit(cls, rows: list[tuple[Features, float]], machine: str = "") -> "CostModel":
-        X = np.stack([f.vec() for f, _ in rows])
-        y = np.array([ms for _, ms in rows])
-        # ridge on the slopes only so a few calibration videos give a stable, non-negative-ish fit
-        lam = 1e-3 * np.eye(X.shape[1]); lam[0, 0] = 0
-        w = np.linalg.solve(X.T @ X + lam, X.T @ y)
-        w[1:] = np.maximum(w[1:], 0.0)
+        """Non-negative least squares on (features -> ms). Repeated (features) rows are reduced to their
+        median first, so a one-off stall in calibration does not become the intercept."""
+        by_key: dict[tuple, list[float]] = {}
+        feats: dict[tuple, Features] = {}
+        for f, ms in rows:
+            k = (f.K, f.Lmax, f.C, f.F, f.R)
+            by_key.setdefault(k, []).append(ms)
+            feats[k] = f
+        X = np.stack([feats[k].vec() for k in by_key])
+        y = np.array([float(np.median(v)) for v in by_key.values()])
+        w = _nnls(X, y)
         resid = y - X @ w
-        Ks = [f.K for f, _ in rows]
-        Ls = [f.Lmax for f, _ in rows if f.Lmax > 0]
-        return cls(w, float(np.percentile(resid, 75)) if len(rows) > 2 else 0.0,
-                   float(np.median(Ks)) if Ks else 40.0, float(np.median(Ls)) if Ls else 150.0, len(rows), machine)
+        Ks = [f.K for f in feats.values()]
+        Ls = [f.Lmax for f in feats.values() if f.Lmax > 0]
+        margin = float(max(0.0, np.percentile(resid, 75))) if len(y) > 2 else 0.0
+        return cls(w, margin, float(np.median(Ks)) if Ks else 40.0, float(np.median(Ls)) if Ls else 150.0,
+                   len(rows), machine)
 
     def to_json(self) -> dict:
         return {"w": self.w.tolist(), "resid_p75": self.resid_p75, "typical_K": self.typical_K,
@@ -108,6 +114,22 @@ class CostModel:
     def from_json(cls, d: dict) -> "CostModel":
         return cls(np.asarray(d["w"], dtype=np.float64), d["resid_p75"], d["typical_K"], d["typical_window"],
                    d.get("n_fit", 0), d.get("machine", ""))
+
+
+def _nnls(X: np.ndarray, y: np.ndarray, iters: int = 5000) -> np.ndarray:
+    """Small non-negative least squares by projected gradient (6 unknowns; no scipy on every box)."""
+    scale = np.maximum(np.abs(X).max(axis=0), 1e-9)
+    Xs = X / scale
+    w = np.zeros(X.shape[1])
+    lr = 1.0 / (np.linalg.norm(Xs, 2) ** 2 + 1e-9)
+    for _ in range(iters):
+        g = Xs.T @ (Xs @ w - y)
+        w_new = np.maximum(w - lr * g, 0.0)
+        if np.abs(w_new - w).max() < 1e-9:
+            w = w_new
+            break
+        w = w_new
+    return w / scale
 
 
 def machine_key() -> str:
@@ -127,7 +149,7 @@ def _cache_path(key: str) -> Path:
 
 
 def calibrate(videos: list, run: Callable[[Config, object], tuple[Features, float]],
-              configs: Optional[list[Config]] = None, cache: bool = True) -> CostModel:
+              configs: Optional[list[Config]] = None, cache: bool = True, repeats: int = 2) -> CostModel:
     """Fit the cost model on the target machine.
 
     `run(cfg, video)` executes the full pipeline for one video under `cfg` and returns the realised features
@@ -145,10 +167,12 @@ def calibrate(videos: list, run: Callable[[Config, object], tuple[Features, floa
             pass
     configs = configs or [Config(4, False), Config(8, True, 6), Config(16, True, 3), Config(16, False)]
     rows: list[tuple[Features, float]] = []
-    run(configs[0], videos[0])  # warm-up (model load, pools, CUDA context)
-    for v in videos:
-        for cfg in configs:
-            rows.append(run(cfg, v))
+    for cfg in configs:  # warm-up pass (model load, pools, CUDA context, first-touch of each path) is discarded
+        run(cfg, videos[0])
+    for _ in range(max(1, repeats)):
+        for v in videos:
+            for cfg in configs:
+                rows.append(run(cfg, v))
     model = CostModel.fit(rows, key)
     if cache:
         try:
