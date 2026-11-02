@@ -86,10 +86,10 @@ def main() -> None:
     ap.add_argument("--kf-alloc", default="equal", choices=["equal", "softmax"], help="budget split across keyframes (006)")
     ap.add_argument("--kf-temp", type=float, default=0.2, help="softmax temperature for --kf-alloc softmax")
     ap.add_argument("--kf-refine", action="store_true", help="coarse-to-fine: score window thumbnails, place frames at peaks (006)")
-    ap.add_argument("--kf-refine-stride", type=int, default=3, help="candidate every k-th frame inside a window")
-    ap.add_argument("--decode-backend", default=None, choices=["process", "thread", "serial"],
-                    help="windowed decode: parallel on the process pool (default where fork exists), threads, or serial (006 path)")
-    ap.add_argument("--clip-fp16", action="store_true", help="run the CLIP scorer in half precision")
+    ap.add_argument("--kf-refine-stride", type=int, default=6, help="candidate every k-th frame inside a window")
+    ap.add_argument("--decode-backend", default="thread", choices=["process", "thread", "serial"],
+                    help="windowed decode: thread pool (default, 007), process pool, or serial (006 path)")
+    ap.add_argument("--clip-fp32", action="store_true", help="run the CLIP scorer in full precision (default fp16)")
     ap.add_argument("--tag", default="", help="suffix appended to kf-* sampler names in the log, e.g. ':gap+softmax'")
     ap.add_argument("--motion-stride", type=int, default=4, help="score every k-th frame for motion")
     ap.add_argument("--limit", type=int, default=None)
@@ -108,7 +108,7 @@ def main() -> None:
     sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     print(gpu, "|", args.backbone, "|", ds, flush=True)
 
-    clip_scorer = ClipScorer(ds.classes, device=device, half=args.clip_fp16) if "kf-clip" in args.samplers else None
+    clip_scorer = ClipScorer(ds.classes, device=device, half=not args.clip_fp32) if "kf-clip" in args.samplers else None
     extractor = HFFeatureExtractor(BACKBONES[args.backbone], device=device)
     probe = LinearProbe(extractor, ucf.num_classes, ucf.classes).load_head(args.head)
 

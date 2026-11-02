@@ -16,6 +16,12 @@ Stage 3 has three knobs (experiment 006):
            a scorer: the window is decoded once at thumbnail resolution every `refine_stride`
            frames, scored, and the frames go to the best-scoring moments. The frames decoded for
            refinement are kept, so `read()` hands them over without a second decode.
+  decode   windows are decoded in parallel, one worker per window (experiment 007): `decode_backend`
+           "thread" (default), "process" or "serial".
+
+Measured defaults (THUMOS14 val, RTX 5090, experiment 007): gap window + softmax 0.2 + CLIP refinement at
+stride 6 in fp16 gives 0.850 / 0.895 / 0.930 top-1 at 4 / 8 / 16 frames in ~150 ms per video; uniform
+sampling gives 0.720 / 0.795 / 0.880 in 147 / 277 / 486 ms.
 """
 
 from __future__ import annotations
@@ -37,8 +43,8 @@ class KeyframeSampler(Sampler):
                  scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None,
                  window: str = "gap", min_window_s: float = 1.0,
                  alloc: str = "equal", temperature: float = 0.2,
-                 refine: Optional[Scorer] = None, refine_stride: int = 3, keep_edge: int = 224,
-                 decode_backend: str | None = None, decode_workers: int | None = None):
+                 refine: Optional[Scorer] = None, refine_stride: int = 6, keep_edge: int = 224,
+                 decode_backend: str = "thread", decode_workers: int | None = None):
         super().__init__(num_frames)
         if window not in ("fixed", "gap"):
             raise ValueError(f"window must be 'fixed' or 'gap', got {window!r}")
@@ -58,7 +64,7 @@ class KeyframeSampler(Sampler):
         self.refine = refine
         self.refine_stride = max(1, int(refine_stride))
         self.keep_edge = keep_edge
-        self.decode_backend = decode_backend  # "process" | "thread" | "serial"; None -> platform default
+        self.decode_backend = decode_backend  # "thread" (default: OpenCV releases the GIL, 007) | "process" | "serial"
         self.decode_workers = decode_workers
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
@@ -246,7 +252,7 @@ class ClipScorer:
 
     def __init__(self, class_names: list[str], model: str = "openai/clip-vit-base-patch32",
                  device: str | None = None, template: str = "a photo of {}", use_hf_processor: bool = False,
-                 half: bool = False):
+                 half: bool = True):
         import torch
         from transformers import CLIPModel, CLIPProcessor
 

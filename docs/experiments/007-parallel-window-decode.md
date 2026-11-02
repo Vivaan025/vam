@@ -1,6 +1,6 @@
 # 007 · Parallel windowed decode
 
-**Date:** 2026-11-02 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-02 · **Status:** done · **Results:** [`docs/results/thumos14_pdecode.md`](../results/thumos14_pdecode.md)
 
 ## Motivation (from 006)
 Coarse-to-fine refinement is the accuracy lever that works (kf-clip-4 0.795 → 0.865, kf-clip-8 0.875 → 0.900),
@@ -44,8 +44,35 @@ lower at 8 and 16 frames.
 - Seek cost is per worker and per window, so it does not shrink; if seeks dominate, the real fix is a decoder
   that seeks cheaply (NVDEC via torchcodec), which becomes 008.
 
+## Changes made
+- `vam/runtime/decode.py`: `Window`, `WindowFrames`, `read_window` (one seek, read forward, keep wanted frames
+  and optional thumbnails, cached `VideoCapture` per worker thread/process), `read_windows(..., workers,
+  backend)` on the scan's process pool, a thread pool, or serial.
+- `KeyframeSampler(decode_backend, decode_workers)`: refinement and `read()` both go through `read_windows`;
+  in `read()` each worker stops at its last wanted frame. First version shared one capture across threads and
+  hung; captures are now thread-local.
+- `ClipScorer(half=)`; benchmark `--decode-backend`, `--clip-fp16` (later inverted to `--clip-fp32`).
+- Tests: parallel window read equals `Video.read` on all three backends; `keep_edge` downscales; sampler
+  parallel read equals serial read.
+
 ## Results
-*(to fill)*
+(200 videos, kf-clip, 4 / 8 / 16 frames; full tables in the results file.)
+- **No refinement, parallel decode**: 0.815 / 0.885 / 0.935 at 141 / 147 / 150 ms (threads). Decode is now
+  flat in the budget (84–99 ms); serial was 80 / 159 / 171 ms.
+- **Threads ≈ processes** for this stage (OpenCV releases the GIL); threads slightly faster end to end and
+  avoid a 15 ms handoff cost seen with pickled frames.
+- **Refinement (gap + softmax 0.2), stride 3, threads**: 0.865 / 0.900 / 0.925 at 169 / 196 / 195 ms
+  (serial in 006: 219 / 378 / 377).
+- **Refinement stride 6 + fp16 CLIP**: 0.850 / 0.895 / 0.930 at 146 / 152 / 151 ms. fp16 costs no accuracy;
+  stride 6 costs ≤ 1.5 points.
+- Hypothesis check: all three targets met (0.865 at 169 ms; 0.900 at 196 ms; decode 1.7–1.8× lower).
 
 ## Decision
-*(to fill)*
+- Defaults: `decode_backend="thread"`, `refine_stride=6`, `ClipScorer(half=True)`. Refinement remains an
+  explicit `refine=scorer` argument in the library (it needs a scorer), and is the recommended configuration:
+  with it the runtime delivers 0.850 / 0.895 / 0.930 in ~150 ms per video at 4 / 8 / 16 frames, against
+  uniform's 0.720 / 0.795 / 0.880 in 147 / 277 / 486 ms.
+- The decode stage is now ~95 ms of seek-bound CPU work and no longer scales with the budget; NVDEC (008)
+  is the only lever left on it and is deferred. Next on accuracy: a learned keyframe scorer (009) to close the
+  remaining 2.5–4 points to the oracle at 4 frames, and the milliseconds-budget scheduler that turns these
+  measured curves into a policy.

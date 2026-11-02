@@ -12,4 +12,4 @@ Raw numbers live in `docs/results/`; this log is the reasoning trail.
 | 004 | 2026-11-01 | [GPU-side preprocessing for scorer and backbone](004-gpu-preprocessing.md) | done | infer 300→20 ms; kf-clip-8 beats uniform-16 on latency at equal accuracy; kf-clip-16 wins both axes |
 | 005 | 2026-11-01 | [Cheaper keyframe scan](005-cheaper-keyframe-scan.md) | done | select 160→46 ms; kf-clip dominates uniform at 8 and 16 frames on both axes, ties latency at 4 |
 | 006 | 2026-11-01 | [Adaptive window and coarse-to-fine refinement](006-adaptive-window.md) | done | gap window default (+2 pts at 4 frames, free); refinement reaches 0.865 / 0.900 at 4 / 8 but costs +67 / +148 ms (OpenCV seek 35–60 ms per window): opt-in until 007 |
-| 007 | 2026-11-02 | [Parallel windowed decode](007-parallel-window-decode.md) | planned | |
+| 007 | 2026-11-02 | [Parallel windowed decode](007-parallel-window-decode.md) | done | decode flat at ~90 ms for any budget; refinement affordable: 0.850 / 0.895 / 0.930 at 4 / 8 / 16 frames in ~150 ms (uniform 0.720 / 0.795 / 0.880 in 147 / 277 / 486) |
