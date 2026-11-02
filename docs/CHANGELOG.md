@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-02 | Plan for experiment 009 (learned, class-free keyframe scorer); roadmap to v0.1; 008 NVDEC deferred | `docs/experiments/009-learned-scorer.md`, `docs/roadmap.md` | [009](experiments/009-learned-scorer.md) |
 | 2026-11-02 | Results of experiment 007; defaults: thread-pool window decode, refinement stride 6, CLIP fp16 (`--clip-fp32` to disable) | `docs/results/thumos14_pdecode.md`, `vam/sampling/keyframe.py`, `benchmarks/eval_thumos14.py` | [007](experiments/007-parallel-window-decode.md) |
 | 2026-11-02 | `vam.runtime.decode.read_windows`: windows decoded in parallel on the scan's process pool (or threads / serial), one seek per window, cached capture per worker; `KeyframeSampler` uses it for refinement and for `read()`; `ClipScorer(half=)`; benchmark `--decode-backend / --clip-fp16`; 3 tests | `vam/runtime/decode.py`, `vam/sampling/keyframe.py`, `benchmarks/eval_thumos14.py`, `tests/test_keyframe.py` | [007](experiments/007-parallel-window-decode.md) |
 | 2026-11-02 | Plan for experiment 007 (parallel windowed decode) | `docs/experiments/007-parallel-window-decode.md` | [007](experiments/007-parallel-window-decode.md) |
