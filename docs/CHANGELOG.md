@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-02 | `vam.runtime.scheduler`: `CostModel` (linear per-stage latency model, `calibrate` with per-machine cache), `Scheduler` (pre-scan and post-scan plan under a ms budget), `Config`/`ACCURACY` table; `KeyframeSampler(planner=)` hook; `benchmarks/eval_scheduler.py`; tests (shared fixture moved to `conftest.py`) | `vam/runtime/scheduler.py`, `vam/sampling/keyframe.py`, `benchmarks/eval_scheduler.py`, `tests/` | [010](experiments/010-ms-budget-scheduler.md) |
 | 2026-11-02 | Plan for experiment 010 (millisecond-budget scheduler, roadmap R2) | `docs/experiments/010-ms-budget-scheduler.md` | [010](experiments/010-ms-budget-scheduler.md) |
 | 2026-11-02 | Results of experiment 009: class-free learned scorer recommended; README status refreshed | `docs/results/thumos14_learned.md`, `README.md` | [009](experiments/009-learned-scorer.md) |
 | 2026-11-02 | `vam.sampling.learned`: `LearnedScorer` (head on CLIP embeddings, per-fold heads), `build_features`, `gap_window_targets`; `ClipScorer.embed`; `scripts/train_scorer.py` (feature cache + 5-fold CV); benchmark `kf-learned --scorer-head` | `vam/sampling/learned.py`, `vam/sampling/keyframe.py`, `scripts/train_scorer.py`, `benchmarks/eval_thumos14.py` | [009](experiments/009-learned-scorer.md) |

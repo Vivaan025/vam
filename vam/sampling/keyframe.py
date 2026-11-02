@@ -44,7 +44,8 @@ class KeyframeSampler(Sampler):
                  window: str = "gap", min_window_s: float = 1.0,
                  alloc: str = "equal", temperature: float = 0.2,
                  refine: Optional[Scorer] = None, refine_stride: int = 6, keep_edge: int = 224,
-                 decode_backend: str = "thread", decode_workers: int | None = None):
+                 decode_backend: str = "thread", decode_workers: int | None = None,
+                 planner=None):
         super().__init__(num_frames)
         if window not in ("fixed", "gap"):
             raise ValueError(f"window must be 'fixed' or 'gap', got {window!r}")
@@ -66,6 +67,7 @@ class KeyframeSampler(Sampler):
         self.keep_edge = keep_edge
         self.decode_backend = decode_backend  # "thread" (default: OpenCV releases the GIL, 007) | "process" | "serial"
         self.decode_workers = decode_workers
+        self.planner = planner  # (kf, scores, chosen, windows) -> (num_frames, refine_on, refine_stride); 010
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
         self.last_chosen: list[int] = []
@@ -121,15 +123,23 @@ class KeyframeSampler(Sampler):
         if scores.shape != (len(kf),):
             raise ValueError(f"scorer returned {scores.shape}, expected ({len(kf)},)")
         chosen = self.pick_keyframes(kf, scores)
-        per = self.allocate(chosen, scores)
         wins = self.windows(kf, chosen, video)
+        refine = self.refine
+        if self.planner is not None:
+            frames, refine_on, stride = self.planner(kf, scores, chosen, wins)
+            self.num_frames = int(frames)
+            self.refine_stride = max(1, int(stride))
+            refine = self.refine if refine_on else None
+            chosen = chosen[: max(1, min(len(chosen), self.num_frames))]
+            wins = wins[: len(chosen)]
+        per = self.allocate(chosen, scores)
         self.last_keyframes, self.last_scores, self.last_chosen, self.last_windows = kf, scores, chosen, wins
         self._cache = {}
         self.last_refine_ms = 0.0
 
         n = video.num_frames
         out: list[int] = []
-        if self.refine is None:
+        if refine is None:
             for i, (start, end) in zip(chosen, wins):
                 k = per[i]
                 if k <= 0:
@@ -163,7 +173,7 @@ class KeyframeSampler(Sampler):
         fps = video.fps
         cands = Keyframes(times=np.asarray(cand_idx, dtype=np.float64) / fps, indices=np.asarray(cand_idx),
                           thumbs=np.stack(cand_thumb), fps=fps, duration=video.duration, num_frames=n)
-        fine = np.asarray(self.refine(cands), dtype=np.float64)
+        fine = np.asarray(refine(cands), dtype=np.float64)
         self.last_fine = (cands, fine)
         for i, first, m in groups:
             k = min(per[i], m)
