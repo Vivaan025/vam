@@ -282,19 +282,27 @@ class ClipScorer:
         import re
         return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name).lower()
 
-    def __call__(self, kf: Keyframes) -> np.ndarray:
+    def embed(self, thumbs: np.ndarray):
+        """L2-normalised CLIP image embeddings (K, 512) as a float32 tensor on the device."""
         import torch
 
         with torch.inference_mode():
             if self.use_hf_processor:
-                px = self.proc(images=list(kf.thumbs), return_tensors="pt")["pixel_values"].to(self.device)
+                px = self.proc(images=list(thumbs), return_tensors="pt")["pixel_values"].to(self.device)
             else:
-                px = self.pre(kf.thumbs)
+                px = self.pre(thumbs)
             if self.half:
                 px = px.half()
             pooled = self.model.vision_model(pixel_values=px).pooler_output
             e = self.model.visual_projection(pooled).float()
-            e = e / e.norm(dim=-1, keepdim=True)
-            logits = 100.0 * e @ self.text.T
-            p = logits.softmax(dim=-1)
+            return e / e.norm(dim=-1, keepdim=True)
+
+    def scores_from_embedding(self, e) -> np.ndarray:
+        import torch
+
+        with torch.inference_mode():
+            p = (100.0 * e @ self.text.T).softmax(dim=-1)
             return (1.0 - p[:, self.n_cls:].sum(dim=-1)).float().cpu().numpy()
+
+    def __call__(self, kf: Keyframes) -> np.ndarray:
+        return self.scores_from_embedding(self.embed(kf.thumbs))

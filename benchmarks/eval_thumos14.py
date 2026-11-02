@@ -31,7 +31,8 @@ import torch
 import vam
 from vam.data import THUMOS14, UCF101, UntrimmedVideo
 from vam.models.probe import HFFeatureExtractor, LinearProbe
-from vam.sampling import ClipScorer, KeyframeSampler, MotionSampler, OracleKeyframeScorer, Sampler, UniformSampler
+from vam.sampling import (ClipScorer, KeyframeSampler, LearnedScorer, MotionSampler, OracleKeyframeScorer, Sampler,
+                          UniformSampler)
 
 BACKBONES = {
     "videomae-base-kinetics": "MCG-NJU/videomae-base-finetuned-kinetics",
@@ -90,6 +91,7 @@ def main() -> None:
     ap.add_argument("--decode-backend", default="thread", choices=["process", "thread", "serial"],
                     help="windowed decode: thread pool (default, 007), process pool, or serial (006 path)")
     ap.add_argument("--clip-fp32", action="store_true", help="run the CLIP scorer in full precision (default fp16)")
+    ap.add_argument("--scorer-head", default=None, help="checkpoint from scripts/train_scorer.py for the kf-learned sampler")
     ap.add_argument("--tag", default="", help="suffix appended to kf-* sampler names in the log, e.g. ':gap+softmax'")
     ap.add_argument("--motion-stride", type=int, default=4, help="score every k-th frame for motion")
     ap.add_argument("--limit", type=int, default=None)
@@ -108,7 +110,9 @@ def main() -> None:
     sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     print(gpu, "|", args.backbone, "|", ds, flush=True)
 
-    clip_scorer = ClipScorer(ds.classes, device=device, half=not args.clip_fp32) if "kf-clip" in args.samplers else None
+    need_clip = any(x in args.samplers for x in ("kf-clip", "kf-learned"))
+    clip_scorer = ClipScorer(ds.classes, device=device, half=not args.clip_fp32) if need_clip else None
+    learned = LearnedScorer.load(args.scorer_head, clip_scorer) if "kf-learned" in args.samplers else None
     extractor = HFFeatureExtractor(BACKBONES[args.backbone], device=device)
     probe = LinearProbe(extractor, ucf.num_classes, ucf.classes).load_head(args.head)
 
@@ -147,6 +151,12 @@ def main() -> None:
                                                   scan_workers=args.scan_workers, keyframe_stride=args.kf_stride,
                                                   scan_backend=args.scan_backend,
                                                   refine=clip_scorer if args.kf_refine else None, **kf_opts)
+                    elif sname == "kf-learned":
+                        sc = learned.for_video(uv.video_id)
+                        sampler = KeyframeSampler(budget, sc, window_s=args.window,
+                                                  scan_workers=args.scan_workers, keyframe_stride=args.kf_stride,
+                                                  scan_backend=args.scan_backend,
+                                                  refine=sc if args.kf_refine else None, **kf_opts)
                     else:
                         raise SystemExit(f"unknown sampler {sname}")
                     p = vam.Profiler()
