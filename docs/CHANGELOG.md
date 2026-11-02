@@ -4,6 +4,8 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-02 | Plan for experiment 007 (parallel windowed decode) | `docs/experiments/007-parallel-window-decode.md` | [007](experiments/007-parallel-window-decode.md) |
+| 2026-11-02 | Results of experiment 006; `window="gap"` is now the `KeyframeSampler` and benchmark default, softmax τ default 0.2, refinement stays opt-in | `docs/results/thumos14_adaptive.md`, `vam/sampling/keyframe.py`, `benchmarks/eval_thumos14.py` | [006](experiments/006-adaptive-window.md) |
 | 2026-11-02 | `KeyframeSampler` options `window="gap"`, `alloc="softmax"` (+`temperature`), `refine=scorer` (+`refine_stride`): coarse-to-fine pass keeps the decoded window frames and `Sampler.read` hands them over; `Video.iter_frames(step)`; benchmark flags `--kf-window/--kf-alloc/--kf-temp/--kf-refine/--tag`; 4 tests | `vam/sampling/keyframe.py`, `vam/sampling/base.py`, `vam/core.py`, `benchmarks/eval_thumos14.py`, `tests/test_keyframe.py` | [006](experiments/006-adaptive-window.md) |
 | 2026-11-01 | Plan for experiment 006 (adaptive window, coarse-to-fine) | `docs/experiments/006-adaptive-window.md` | [006](experiments/006-adaptive-window.md) |
 | 2026-11-01 | Results of experiment 005 | `docs/results/thumos14_scan.md` | [005](experiments/005-cheaper-keyframe-scan.md) |

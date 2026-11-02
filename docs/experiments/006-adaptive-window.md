@@ -1,6 +1,6 @@
 # 006 · Adaptive window and coarse-to-fine refinement
 
-**Date:** 2026-11-01 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-01 · **Status:** done · **Results:** [`docs/results/thumos14_adaptive.md`](../results/thumos14_adaptive.md)
 
 ## Motivation (from 003 and 005)
 With the scan at ~46 ms, the gap to the oracle is now the scorer's and the window's:
@@ -54,8 +54,30 @@ total ms within +40 of 005 (152 / 230).
 - Score-proportional allocation can collapse onto one wrong peak at 4 frames; the temperature controls
   this and will be swept (τ ∈ {0.05, 0.1, 0.2}).
 
+## Changes made
+- `KeyframeSampler(window="gap"|"fixed", min_window_s, alloc="equal"|"softmax", temperature, refine=scorer,
+  refine_stride, keep_edge)`. Refinement decodes each window once (`Video.iter_frames(step)`), scores the
+  thumbnails, places frames at the peaks with a minimum spacing of `window/(2k)` candidates, and keeps the
+  decoded frames so the new `Sampler.read(video, indices)` hook hands them over without a second decode.
+- `eval_thumos14.py --kf-window --kf-alloc --kf-temp --kf-refine --kf-refine-stride --tag`; `refine_ms` logged.
+- Four tests: gap window stops at the next keyframe, softmax allocation sums to the budget, refinement with an
+  oracle moves all frames into a short action, cached frames equal a fresh decode.
+
 ## Results
-*(to fill)*
+(200 videos, kf-clip, 4 / 8 / 16 frames; full tables in the results file.)
+- **Gap window**: 0.815 / 0.885 / 0.935 at 148 / 223 / 225 ms. +2 / +1 / 0 points, same latency.
+- **Softmax alone**: 0.785 / 0.875 / 0.920. Slightly worse; the top window is not reliable enough to bet on.
+- **Refine alone**: 0.835 / 0.890 / 0.925 at 236 / 413 / 411 ms.
+- **Gap + softmax 0.2 + refine**: **0.865 / 0.900 / 0.925** at 219 / 378 / 377 ms. τ ∈ {0.05, 0.1, 0.2}
+  within 1 point of each other.
+- **kf-oracle + refine**: 0.865 / 0.915 / 0.945 (oracle 0.890 / 0.925 / 0.955): the mechanism is sound.
+- Hypothesis check: accuracy targets met (0.865 ≥ 0.83, 0.900 ≥ 0.90); latency target missed (+67 / +148 ms vs
+  +40). Profiling: OpenCV seek is a flat 35–60 ms per window and decode 0.3 ms/frame, so a full 5 s window
+  costs ~95 ms; CLIP on the window thumbnails is 49 ms per 200 thumbnails. PyAV is slower still (0.9 ms/frame).
 
 ## Decision
-*(to fill)*
+- `window="gap"` becomes the default (free). Softmax allocation stays off by default (helps only with
+  refinement); default τ = 0.2.
+- Refinement stays opt-in (`refine=scorer`). It is the right accuracy mechanism and is kept in the API, but it
+  cannot be the default until the window decode is cheap. That is experiment 007 (windows decoded in parallel
+  on the process pool, as the scan is), with NVDEC as the fallback (008). The learned scorer moves to 009.

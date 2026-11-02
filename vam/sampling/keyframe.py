@@ -8,8 +8,8 @@ Stage 3  pick `segments` keyframes by score with temporal non-max suppression, t
          read per segment instead of one seek per frame.
 
 Stage 3 has three knobs (experiment 006):
-  window   "fixed": `window_s` seconds after the keyframe.
-           "gap":   up to the next keyframe, clipped to [min_window_s, window_s].
+  window   "gap" (default): up to the next keyframe, clipped to [min_window_s, window_s].
+           "fixed": `window_s` seconds after the keyframe.
   alloc    "equal": budget split evenly, remainder to the best scores.
            "softmax": proportional to softmax(score / temperature).
   refine   None: frames spaced evenly inside the window.
@@ -35,8 +35,8 @@ class KeyframeSampler(Sampler):
     def __init__(self, num_frames: int, scorer: Scorer, window_s: float = 5.0,
                  segments: Optional[int] = None, thumb: tuple[int, int] = (112, 112),
                  scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None,
-                 window: str = "fixed", min_window_s: float = 1.0,
-                 alloc: str = "equal", temperature: float = 0.1,
+                 window: str = "gap", min_window_s: float = 1.0,
+                 alloc: str = "equal", temperature: float = 0.2,
                  refine: Optional[Scorer] = None, refine_stride: int = 3, keep_edge: int = 224):
         super().__init__(num_frames)
         if window not in ("fixed", "gap"):

@@ -142,8 +142,8 @@ def test_refinement_moves_frames_into_action(h264_video):
     v = vam.load_video(path)
     # stage 2 deliberately picks the keyframe at ~18 s; the action starts at 20 s inside its 4 s window
     fine = OracleKeyframeScorer([(20.0, 30.0)], 0.1)
-    base = KeyframeSampler(4, _prefer_time(18.0), window_s=4.0, segments=1)
-    ref = KeyframeSampler(4, _prefer_time(18.0), window_s=4.0, segments=1, refine=fine, refine_stride=2)
+    base = KeyframeSampler(4, _prefer_time(18.0), window_s=4.0, segments=1, window="fixed")
+    ref = KeyframeSampler(4, _prefer_time(18.0), window_s=4.0, segments=1, window="fixed", refine=fine, refine_stride=2)
     a, b = base.select(v), ref.select(v)
     assert abs(v.read(a).indices[0].item() - 180) <= 20
     assert any(i < 200 for i in a), a          # even placement wastes frames before the action

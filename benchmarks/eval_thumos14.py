@@ -82,9 +82,9 @@ def main() -> None:
     ap.add_argument("--scan-backend", default=None, choices=["process", "thread", "serial"],
                     help="default: process where fork is available, else thread")
     ap.add_argument("--kf-stride", type=int, default=1, help="keep every k-th keyframe in the scan")
-    ap.add_argument("--kf-window", default="fixed", choices=["fixed", "gap"], help="window after a keyframe (006)")
+    ap.add_argument("--kf-window", default="gap", choices=["fixed", "gap"], help="window after a keyframe (006: gap is the default)")
     ap.add_argument("--kf-alloc", default="equal", choices=["equal", "softmax"], help="budget split across keyframes (006)")
-    ap.add_argument("--kf-temp", type=float, default=0.1, help="softmax temperature for --kf-alloc softmax")
+    ap.add_argument("--kf-temp", type=float, default=0.2, help="softmax temperature for --kf-alloc softmax")
     ap.add_argument("--kf-refine", action="store_true", help="coarse-to-fine: score window thumbnails, place frames at peaks (006)")
     ap.add_argument("--kf-refine-stride", type=int, default=3, help="candidate every k-th frame inside a window")
     ap.add_argument("--tag", default="", help="suffix appended to kf-* sampler names in the log, e.g. ':gap+softmax'")
