@@ -37,7 +37,8 @@ class KeyframeSampler(Sampler):
                  scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None,
                  window: str = "gap", min_window_s: float = 1.0,
                  alloc: str = "equal", temperature: float = 0.2,
-                 refine: Optional[Scorer] = None, refine_stride: int = 3, keep_edge: int = 224):
+                 refine: Optional[Scorer] = None, refine_stride: int = 3, keep_edge: int = 224,
+                 decode_backend: str | None = None, decode_workers: int | None = None):
         super().__init__(num_frames)
         if window not in ("fixed", "gap"):
             raise ValueError(f"window must be 'fixed' or 'gap', got {window!r}")
@@ -57,6 +58,8 @@ class KeyframeSampler(Sampler):
         self.refine = refine
         self.refine_stride = max(1, int(refine_stride))
         self.keep_edge = keep_edge
+        self.decode_backend = decode_backend  # "process" | "thread" | "serial"; None -> platform default
+        self.decode_workers = decode_workers
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
         self.last_chosen: list[int] = []
@@ -129,23 +132,25 @@ class KeyframeSampler(Sampler):
                 out.extend(int(start + o) for o in offs)
             return sorted(set(min(i, n - 1) for i in out))
 
-        # coarse-to-fine: decode each window once at stride, score thumbnails, place frames at the peaks
+        # coarse-to-fine: decode each window once at stride (in parallel, experiment 007), score the
+        # thumbnails, place the window's frames at the peaks
         import time
 
-        import cv2
+        from vam.runtime.decode import Window, read_windows
 
         t0 = time.perf_counter()
+        jobs = [(i, Window(start, end, None, self.refine_stride)) for i, (start, end) in zip(chosen, wins) if per[i] > 0]
+        parts = read_windows(video.path, [w for _, w in jobs], thumb=self.thumb, keep_edge=self.keep_edge,
+                             workers=self.decode_workers, backend=self.decode_backend)
         cand_idx: list[int] = []
         cand_thumb: list[np.ndarray] = []
         groups: list[tuple[int, int, int]] = []  # (chosen keyframe, first candidate, n candidates)
-        for i, (start, end) in zip(chosen, wins):
-            if per[i] <= 0:
-                continue
+        for (i, _), wf in zip(jobs, parts):
             first = len(cand_idx)
-            for idx, frame in video.iter_frames(start, end, step=self.refine_stride):
-                self._cache[idx] = self._keep(frame, cv2)
+            for j, idx in enumerate(wf.indices.tolist()):
+                self._cache[idx] = wf.frames[j]
                 cand_idx.append(idx)
-                cand_thumb.append(cv2.resize(frame, self.thumb, interpolation=cv2.INTER_AREA))
+                cand_thumb.append(wf.thumbs[j])
             groups.append((i, first, len(cand_idx) - first))
         if not cand_idx:
             return []
@@ -168,27 +173,39 @@ class KeyframeSampler(Sampler):
         self.last_refine_ms = (time.perf_counter() - t0) * 1000.0
         return sorted(set(out))
 
-    def _keep(self, frame: np.ndarray, cv2) -> np.ndarray:
-        """Store a decoded frame for read(): downscaled so its shortest edge is keep_edge (the model
-        crops at 224 anyway), so a cache of a few hundred frames stays small even for 1080p input."""
-        h, w = frame.shape[:2]
-        e = min(h, w)
-        if self.keep_edge and e > self.keep_edge:
-            r = self.keep_edge / e
-            frame = cv2.resize(frame, (max(1, round(w * r)), max(1, round(h * r))), interpolation=cv2.INTER_AREA)
-        return frame
-
     def read(self, video: Video, indices: list[int]):
-        if indices and all(i in self._cache for i in indices):
-            import torch
+        """Hand over frames kept by the refinement pass; otherwise decode the windows in parallel,
+        each worker reading only up to its last wanted frame (experiment 007)."""
+        import torch
 
-            from vam.core import FrameBatch
+        from vam.core import FrameBatch
 
-            idx = sorted(set(int(i) for i in indices))
-            arr = torch.from_numpy(np.stack([self._cache[i] for i in idx]))
-            idx_t = torch.tensor(idx, dtype=torch.long)
-            return FrameBatch(arr, idx_t.float() / float(video.fps), idx_t)
-        return video.read(indices)
+        idx = sorted(set(int(i) for i in indices))
+        if not idx:
+            raise ValueError("no frames requested")
+        if not all(i in self._cache for i in idx):
+            if self.decode_backend == "serial" or not self.last_windows:
+                return video.read(idx)
+            from vam.runtime.decode import Window, read_windows
+
+            jobs = []
+            for start, end in self.last_windows:
+                want = [i for i in idx if start <= i < end]
+                if want:
+                    jobs.append(Window(start, end, want))
+            covered = {i for w in jobs for i in w.want}
+            if covered != set(idx):
+                return video.read(idx)
+            for wf in read_windows(video.path, jobs, thumb=None, keep_edge=self.keep_edge,
+                                   workers=self.decode_workers, backend=self.decode_backend):
+                for j, i in enumerate(wf.indices.tolist()):
+                    self._cache[i] = wf.frames[j]
+            idx = [i for i in idx if i in self._cache]
+            if not idx:
+                raise ValueError("no frames could be decoded for the requested indices")
+        arr = torch.from_numpy(np.stack([self._cache[i] for i in idx]))
+        idx_t = torch.tensor(idx, dtype=torch.long)
+        return FrameBatch(arr, idx_t.float() / float(video.fps), idx_t)
 
 
 # ---- scorers -------------------------------------------------------------------------------
@@ -228,7 +245,8 @@ class ClipScorer:
                   "a blank screen", "a logo", "people talking", "a commercial break"]
 
     def __init__(self, class_names: list[str], model: str = "openai/clip-vit-base-patch32",
-                 device: str | None = None, template: str = "a photo of {}", use_hf_processor: bool = False):
+                 device: str | None = None, template: str = "a photo of {}", use_hf_processor: bool = False,
+                 half: bool = False):
         import torch
         from transformers import CLIPModel, CLIPProcessor
 
@@ -236,6 +254,9 @@ class ClipScorer:
 
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model = CLIPModel.from_pretrained(model).eval().to(self.device)
+        self.half = half and self.device != "cpu"
+        if self.half:
+            self.model = self.model.half()
         self.proc = CLIPProcessor.from_pretrained(model)
         self.use_hf_processor = use_hf_processor
         self.pre = Preprocessor.from_hf(self.proc.image_processor, device=self.device)
@@ -247,7 +268,7 @@ class ClipScorer:
             # text_model + projection is stable across transformers 4.x and 5.x
             # (get_text_features returns a tensor in 4.x and an output object in 5.x)
             pooled = self.model.text_model(**t).pooler_output
-            e = self.model.text_projection(pooled)
+            e = self.model.text_projection(pooled).float()
             self.text = e / e.norm(dim=-1, keepdim=True)
 
     @staticmethod
@@ -263,8 +284,10 @@ class ClipScorer:
                 px = self.proc(images=list(kf.thumbs), return_tensors="pt")["pixel_values"].to(self.device)
             else:
                 px = self.pre(kf.thumbs)
+            if self.half:
+                px = px.half()
             pooled = self.model.vision_model(pixel_values=px).pooler_output
-            e = self.model.visual_projection(pooled)
+            e = self.model.visual_projection(pooled).float()
             e = e / e.norm(dim=-1, keepdim=True)
             logits = 100.0 * e @ self.text.T
             p = logits.softmax(dim=-1)

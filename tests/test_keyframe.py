@@ -164,3 +164,47 @@ def test_iter_frames_step_matches_read(h264_video):
     ref = v.read([100, 103, 106, 109])
     assert all((f == ref.frames[k].numpy()).all() for k, (_, f) in enumerate(got))
     v.close()
+
+
+@pytest.mark.parametrize("backend", ["serial", "thread", "process"])
+def test_read_windows_matches_video_read(h264_video, backend):
+    import multiprocessing as mp
+
+    from vam.runtime.decode import Window, read_windows
+
+    if backend == "process" and "fork" not in mp.get_all_start_methods():
+        pytest.skip("process backend needs fork")
+    path, fps, n = h264_video
+    v = vam.load_video(path)
+    wins = [Window(40, 80, [41, 55, 79]), Window(200, 240, None, 7), Window(280, 300, [280, 299])]
+    parts = read_windows(path, wins, thumb=(16, 12), keep_edge=0, workers=3, backend=backend)
+    assert parts[0].indices.tolist() == [41, 55, 79]
+    assert parts[1].indices.tolist() == list(range(200, 240, 7))
+    assert parts[2].indices.tolist() == [280, 299]
+    assert parts[1].thumbs.shape == (len(parts[1].indices), 12, 16, 3)
+    for wf in parts:
+        ref = v.read(wf.indices.tolist())
+        assert (wf.frames == ref.frames.numpy()).all()
+    v.close()
+
+
+def test_read_windows_keep_edge_downscales(h264_video):
+    from vam.runtime.decode import Window, read_windows
+
+    path, fps, n = h264_video
+    (wf,) = read_windows(path, [Window(10, 20, [10, 15])], keep_edge=60, backend="serial")
+    assert wf.frames.shape[1:] == (60, 80, 3)  # 120x160 -> shortest edge 60
+
+
+def test_parallel_read_equals_serial_read(h264_video):
+    path, fps, n = h264_video
+    v = vam.load_video(path)
+    scorer = OracleKeyframeScorer([(20.0, 30.0)], 2.0)
+    a = KeyframeSampler(8, scorer, window_s=2.0, segments=2, decode_backend="serial")
+    b = KeyframeSampler(8, scorer, window_s=2.0, segments=2, decode_backend="thread")
+    ia, ib = a.select(v), b.select(v)
+    assert ia == ib
+    fa, fb = a.read(v, ia), b.read(v, ib)
+    assert fa.indices.tolist() == fb.indices.tolist() == ia
+    assert (fa.frames == fb.frames).all()
+    v.close()
