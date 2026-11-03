@@ -43,7 +43,7 @@ class KeyframeSampler(Sampler):
                  scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None,
                  window: str = "gap", min_window_s: float = 1.0,
                  alloc: str = "equal", temperature: float = 0.2,
-                 refine: Optional[Scorer] = None, refine_stride: int = 6, keep_edge: int = 224,
+                 refine: "Optional[Scorer] | bool" = True, refine_stride: int = 6, keep_edge: int = 224,
                  decode_backend: str = "thread", decode_workers: int | None = None,
                  planner=None):
         super().__init__(num_frames)
@@ -62,7 +62,10 @@ class KeyframeSampler(Sampler):
         self.min_window_s = min_window_s
         self.alloc = alloc
         self.temperature = temperature
-        self.refine = refine
+        # coarse-to-fine refinement inside the chosen windows (006/007). Default: on, with the same scorer
+        # (011: it is what keeps the sampler above uniform when keyframes are sparse). Pass False / None to
+        # disable, or another Scorer to refine with it.
+        self.refine = scorer if refine is True else (refine or None)
         self.refine_stride = max(1, int(refine_stride))
         self.keep_edge = keep_edge
         self.decode_backend = decode_backend  # "thread" (default: OpenCV releases the GIL, 007) | "process" | "serial"
