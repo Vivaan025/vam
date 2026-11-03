@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-04 | Results of experiment 011 (CPU tier): learned head holds on the held-out test split, resolution / codec neutral, keyframe density matters; erratum in the scheduler benchmark fixed (planner can switch refinement on); README v0.5 | `docs/results/thumos14_generality.md`, `benchmarks/eval_scheduler.py`, `docs/experiments/010-*.md`, `README.md` | [011](experiments/011-generality.md) |
 | 2026-11-03 | Keyframe scan feeds only keyframe packets to the decoder (demux + `is_keyframe`): libvpx ignores `skip_frame=NONKEY`, so VP9 files returned every frame as a keyframe (5,000 per video, 34 s select); now 40 keyframes in 119 ms, and H.264 / HEVC scans 25–30 % faster. Per-codec regression test | `vam/runtime/scan.py`, `tests/test_keyframe.py` | [011](experiments/011-generality.md) |
 | 2026-11-03 | Plan for experiment 011 (generality, roadmap R3): THUMOS14 test split (download URLs fixed), `scripts/reencode_variants.py` (1080p / HEVC / VP9 / GOP 30 / GOP 900 roots), `--split` on both benchmarks | `docs/experiments/011-generality.md`, `scripts/`, `benchmarks/` | [011](experiments/011-generality.md) |
 | 2026-11-03 | Results of experiment 010: scheduler walks the frontier from a ms budget alone (0.855 → 0.910 → 0.945 at 100 / 150 / 200 ms), CPU tier adapts; README v0.4 | `docs/results/thumos14_scheduler.md`, `README.md`, `docs/study_guide.html` | [010](experiments/010-ms-budget-scheduler.md) |

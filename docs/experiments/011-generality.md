@@ -1,6 +1,6 @@
 # 011 · Generality: held-out split, resolution, codec, keyframe density
 
-**Date:** 2026-11-03 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-03 · **Status:** done (CPU tier; GPU latency rerun and VP9 full rerun pending) · **Results:** [`docs/results/thumos14_generality.md`](../results/thumos14_generality.md)
 
 ## Motivation (from 009 and 010)
 Every number so far is 200 THUMOS14 validation videos at 320×180 H.264 with the encoder's default keyframe
@@ -53,8 +53,38 @@ refinement stays above uniform at 4 frames.
 - The test split has the same 20 classes and camera styles as val; passing H1 says the head did not overfit its
   folds, not that it generalises to other footage.
 
+## Changes made
+- `scripts/download_thumos14.py`: test-split URLs corrected. `scripts/reencode_variants.py`: five variant roots.
+  `--split` on both benchmarks. `vam/runtime/scan.py`: decode only keyframe packets (VP9 fix, 25–30 % faster
+  on H.264 / HEVC); per-codec test. `benchmarks/eval_scheduler.py`: the planner can now switch refinement on
+  (erratum, see results).
+
 ## Results
-*(to fill)*
+(All on CPU: the GPU was occupied by another user's process throughout. Accuracy is device-independent.)
+- **H1, held-out split (212 test videos):** kf-learned + refine **0.868 / 0.901 / 0.915** vs uniform 0.769 /
+  0.816 / 0.858 and oracle 0.863 / 0.873 / 0.925. Reaches or passes the oracle at 4 and 8 frames on videos no
+  head saw; hit rate 0.48–0.52 vs uniform 0.30. The split has half the headroom of validation, so the margin over
+  uniform is +10 / +8.5 / +6 points rather than +14.5 / +13 / +6.
+- **H2, resolution and codec (50 videos):** no accuracy change beyond noise on 1080p H.264 and 720p HEVC; decode
+  cost scales with resolution and the per-root cost model picks it up. **VP9 broke the scan**: libvpx ignores
+  `skip_frame`, every frame came back as a keyframe, select took 34 s. Fixed: the scan feeds only keyframe
+  packets; VP9 scan 1,491 → 119 ms, H.264 / HEVC scans 25–30 % faster.
+- **H3, keyframe density:** GOP 30 (153 keyframes) raises hit rate to 0.53–0.55 and accuracy to 0.940 / 0.960 /
+  0.940, at a scan cost the scheduler sees (6.4 ms per keyframe on CPU). GOP 900 (6 keyframes, 30 s windows)
+  drops kf-learned without refinement to 0.760 / 0.820 / 0.880, below uniform at 4 and 16; refinement recovers
+  0.820 / 0.880 / 0.940.
+- **Erratum:** the scheduler benchmark could log a post-scan switch into refinement without running it (8 + 18
+  rows in 010 at 125 / 150 ms; all GOP 900 scheduler rows here). Fixed; the 010 budgets 125 and 150 are re-run
+  when the GPU is free.
 
 ## Decision
-*(to fill)*
+- The learned head ships as the default scorer: it holds on a split it never saw. The fold-average head is what
+  unseen videos get; training one head on all 412 annotated videos is a later packaging step, not a result.
+- Refinement becomes **on by default** in `KeyframeSampler`: it is what keeps the runtime above uniform when
+  keyframes are sparse, and it costs nothing it did not already cost on the GPU (007). The scheduler decides
+  when to drop it.
+- The scan should report keyframe density, and the scheduler should treat "fewer than ~2 keyframes per
+  minute" as a signal to prefer refinement over frames; that is a small follow-up inside R4 (robustness), where
+  VP9 now also has a regression test.
+- A second domain (Charades) is 012. GPU reruns (latency tables, VP9 full run, 010 erratum budgets) are queued
+  behind the GPU being freed.

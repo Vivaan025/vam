@@ -42,7 +42,7 @@ Three rules keep this a library rather than a model zoo:
    agent policies fill `actions`. Everything above the model works for both.
 3. **PyTorch is the backend.** Custom kernels only replace an op after profiling proves it matters.
 
-## Status: v0.4 · see `docs/experiments/` for the log and `docs/roadmap.md` for the path to v0.1 on PyPI
+## Status: v0.5 · see `docs/experiments/` for the log and `docs/roadmap.md` for the path to v0.1 on PyPI
 
 On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear probe fitted on UCF101):
 
@@ -55,6 +55,10 @@ On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear prob
 Given a budget in **milliseconds** instead of frames, the scheduler calibrates a cost model on the machine in
 6 s and picks frames, refinement and stride itself: 0.855 at 100 ms, 0.910 at 150, 0.945 at 200 and above
 (`docs/results/thumos14_scheduler.md`). On a CPU-only host it picks different configurations at every budget.
+
+On the 212 **held-out** THUMOS14 test videos, which no head was trained on, the same runtime reaches 0.868 / 0.901 /
+0.915 at 4 / 8 / 16 frames against uniform 0.769 / 0.816 / 0.858 and the oracle's 0.863 / 0.873 / 0.925
+(`docs/results/thumos14_generality.md`). Resolution and codec do not change accuracy; keyframe density does.
 
 
 - [x] `Video` with lazy decoding, `FrameBatch`, `ActionOutput`
@@ -74,7 +78,8 @@ Given a budget in **milliseconds** instead of frames, the scheduler calibrates a
 - [x] Parallel windowed decode: latency flat at ~150 ms for any budget (`docs/results/thumos14_pdecode.md`)
 - [x] Learned, class-free keyframe scorer: equals the oracle at 8 frames (`docs/results/thumos14_learned.md`)
 - [x] Millisecond-budget scheduler: calibrated cost model + pre/post-scan policy (`docs/results/thumos14_scheduler.md`)
-- [ ] Generality: second dataset, 1080p, other codecs; robustness; packaging (see `docs/roadmap.md`)
+- [x] Generality within domain: held-out split, 1080p, HEVC, VP9, keyframe density (`docs/results/thumos14_generality.md`)
+- [ ] Second domain (Charades); robustness; packaging (see `docs/roadmap.md`)
 - [ ] GPU windowed decode (NVDEC) — deferred past v0.1
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline

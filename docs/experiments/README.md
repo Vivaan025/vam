@@ -16,4 +16,4 @@ Raw numbers live in `docs/results/`; this log is the reasoning trail.
 | 008 | – | NVDEC decode | deferred | see `docs/roadmap.md` |
 | 009 | 2026-11-02 | [Learned keyframe scorer](009-learned-scorer.md) | done | class-free context head: 0.865 / 0.925 / 0.940 at 4 / 8 / 16 frames in ~150 ms (oracle 0.890 / 0.925 / 0.955); equals the oracle at 8 |
 | 010 | 2026-11-02 | [Millisecond-budget scheduler](010-ms-budget-scheduler.md) | done | given only a ms budget: 0.855 / 0.910 / 0.945 at 100 / 150 / 200 ms (uniform 0.720 / 0.720 / 0.720; hindsight static 0.855 / 0.935 / 0.940); cost model calibrates in 6 s and adapts on CPU; within-budget rate limited by host jitter |
-| 011 | 2026-11-03 | [Generality: held-out split, resolution, codec, keyframe density](011-generality.md) | planned | |
+| 011 | 2026-11-03 | [Generality: held-out split, resolution, codec, keyframe density](011-generality.md) | done (CPU; GPU reruns pending) | held-out test: kf-learned + refine 0.868 / 0.901 / 0.915 vs uniform 0.769 / 0.816 / 0.858, oracle 0.863 / 0.873 / 0.925; 1080p / HEVC unchanged; VP9 broke the scan (fixed, 12× faster); sparse keyframes need refinement, dense ones raise hit rate |

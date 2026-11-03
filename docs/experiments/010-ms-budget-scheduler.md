@@ -80,6 +80,11 @@ the chosen configurations visibly different from the 5090's.
 - The first pass used naive least squares on 12 rows and fitted a 282 ms intercept with zero slopes, which made
   the scheduler pick 4f up to 150 ms. Fixed before the reported run (median of repeats, NNLS, warm-up pass).
 
+**Erratum (2026-11-04, found in 011):** the benchmark only gave the sampler the refinement scorer when the
+pre-scan plan chose refinement, so post-scan switches *into* refinement were logged but not run: 8 videos at
+125 ms and 18 at 150 ms (none at 100 / 200 / 300, where pre = post). Fixed in `benchmarks/eval_scheduler.py`;
+budgets 125 and 150 to be re-run on the GPU.
+
 ## Decision
 - `vam.runtime.Scheduler` is the budget-facing entry point; `calibrate` runs once per machine. Margin stays 1.0:
   the p75-residual term already makes predictions conservative, and extra margin costs accuracy in the flat

@@ -65,8 +65,11 @@ def main() -> None:
 
     def make_sampler(cfg: Config, video_id: str, planner=None) -> KeyframeSampler:
         sc = learned.for_video(video_id)
+        # With a planner the post-scan plan may switch refinement on, so the sampler always carries the scorer
+        # and the planner toggles it (011 erratum: before this, a grow-into-refinement was logged but never ran).
         return KeyframeSampler(cfg.frames, sc, segments=cfg.segments, alloc="softmax", temperature=0.2,
-                               refine=sc if cfg.refine else None, refine_stride=cfg.stride, planner=planner)
+                               refine=sc if (cfg.refine or planner is not None) else None,
+                               refine_stride=cfg.stride, planner=planner)
 
     def run_once(sampler: KeyframeSampler, v):
         p = vam.Profiler()
