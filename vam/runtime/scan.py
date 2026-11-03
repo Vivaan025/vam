@@ -45,17 +45,27 @@ def _scan_range(path: str, t0: float, t1: float, thumb: tuple[int, int], stride:
         if t0 > 0:
             c.seek(int(t0 / tb), stream=s, backward=True, any_frame=False)
         k = 0
-        for f in c.decode(s):
-            if f.pts is None:
+        done = False
+        # Feed the decoder keyframe packets only. skip_frame="NONKEY" alone is not enough: libvpx (VP9) and
+        # some HEVC builds ignore it and decode every frame (011: 34 s per video on VP9 instead of ~0.4 s).
+        # The demuxer flags keyframes from the container index, so non-key packets are dropped unread.
+        for pkt in c.demux(s):
+            if pkt.dts is not None and not pkt.is_keyframe:
                 continue
-            t = f.pts * tb
-            if t < t0:
-                continue
-            if t >= t1:
+            for f in pkt.decode():
+                if f.pts is None:
+                    continue
+                t = f.pts * tb
+                if t < t0:
+                    continue
+                if t >= t1:
+                    done = True
+                    break
+                if k % stride == 0:
+                    out.append((t, f.to_ndarray(format="rgb24", width=thumb[0], height=thumb[1])))
+                k += 1
+            if done:
                 break
-            if k % stride == 0:
-                out.append((t, f.to_ndarray(format="rgb24", width=thumb[0], height=thumb[1])))
-            k += 1
     return out
 
 

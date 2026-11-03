@@ -185,3 +185,35 @@ def test_parallel_read_equals_serial_read(h264_video):
     assert fa.indices.tolist() == fb.indices.tolist() == ia
     assert (fa.frames == fb.frames).all()
     v.close()
+
+
+@pytest.mark.parametrize("codec", ["libvpx-vp9", "libx265", "libx264"])
+def test_scan_returns_only_keyframes_for_every_codec(tmp_path, codec):
+    """011: libvpx ignores skip_frame=NONKEY, so a scan that relies on it returns every frame (5,000
+    'keyframes' on a 3-minute VP9 file). The scan feeds only keyframe packets to the decoder."""
+    import av
+
+    if av.codec.Codec(codec, "w") is None:
+        pytest.skip(f"{codec} encoder not available")
+    path = str(tmp_path / f"{codec}.mp4")
+    fps, n, w, h, gop = 10, 100, 96, 64, 20
+    with av.open(path, "w") as c:
+        s = c.add_stream(codec, rate=fps)
+        s.width, s.height, s.pix_fmt = w, h, "yuv420p"
+        s.codec_context.gop_size = gop
+        if codec == "libvpx-vp9":
+            s.options = {"deadline": "realtime", "cpu-used": "8", "kf-max-dist": str(gop), "kf-min-dist": str(gop)}
+        elif codec == "libx265":
+            s.options = {"x265-params": f"keyint={gop}:min-keyint={gop}:scenecut=0", "preset": "ultrafast"}
+        else:
+            s.options = {"g": str(gop), "keyint_min": str(gop), "sc_threshold": "0", "preset": "ultrafast"}
+        for i in range(n):
+            f = np.zeros((h, w, 3), np.uint8)
+            f[:, (i * 3) % w: (i * 3) % w + 8] = 200
+            for pk in s.encode(av.VideoFrame.from_ndarray(f, format="rgb24")):
+                c.mux(pk)
+        for pk in s.encode():
+            c.mux(pk)
+    kf = scan_keyframes(path, thumb=(16, 12), workers=2, backend="thread")
+    assert 3 <= len(kf) <= n // gop + 2, f"{codec}: {len(kf)} keyframes for {n} frames at gop {gop}"
+    assert np.all(np.diff(kf.times) > 0)
