@@ -19,11 +19,11 @@ from pathlib import Path
 
 ANN = {
     "val": "https://www.crcv.ucf.edu/THUMOS14/Validation_set/TH14_Temporal_annotations_validation.zip",
-    "test": "https://www.crcv.ucf.edu/THUMOS14/test_set/TH14_Temporal_Annotations_Test.zip",
+    "test": "https://www.crcv.ucf.edu/THUMOS14/test_set/TH14_Temporal_annotations_test.zip",
 }
 VID = {
     "val": "https://www.crcv.ucf.edu/THUMOS14/Validation_set/videos/{vid}.mp4",
-    "test": "https://www.crcv.ucf.edu/THUMOS14/test_set/videos/{vid}.mp4",
+    "test": "https://www.crcv.ucf.edu/THUMOS14/test_set/TH14_test_set_mp4/{vid}.mp4",
 }
 
 

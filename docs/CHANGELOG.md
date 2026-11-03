@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-03 | Plan for experiment 011 (generality, roadmap R3): THUMOS14 test split (download URLs fixed), `scripts/reencode_variants.py` (1080p / HEVC / VP9 / GOP 30 / GOP 900 roots), `--split` on both benchmarks | `docs/experiments/011-generality.md`, `scripts/`, `benchmarks/` | [011](experiments/011-generality.md) |
 | 2026-11-03 | Results of experiment 010: scheduler walks the frontier from a ms budget alone (0.855 → 0.910 → 0.945 at 100 / 150 / 200 ms), CPU tier adapts; README v0.4 | `docs/results/thumos14_scheduler.md`, `README.md`, `docs/study_guide.html` | [010](experiments/010-ms-budget-scheduler.md) |
 | 2026-11-02 | Scheduler calibration made robust to one-off stalls: median of repeated rows, non-negative least squares, discarded warm-up pass, `--calib-repeats`; test | `vam/runtime/scheduler.py`, `benchmarks/eval_scheduler.py`, `tests/test_scheduler.py` | [010](experiments/010-ms-budget-scheduler.md) |
 | 2026-11-02 | `vam.runtime.scheduler`: `CostModel` (linear per-stage latency model, `calibrate` with per-machine cache), `Scheduler` (pre-scan and post-scan plan under a ms budget), `Config`/`ACCURACY` table; `KeyframeSampler(planner=)` hook; `benchmarks/eval_scheduler.py`; tests (shared fixture moved to `conftest.py`) | `vam/runtime/scheduler.py`, `vam/sampling/keyframe.py`, `benchmarks/eval_scheduler.py`, `tests/` | [010](experiments/010-ms-budget-scheduler.md) |

@@ -72,6 +72,7 @@ class OracleSampler(Sampler):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="data/thumos14")
+    ap.add_argument("--split", default="val", choices=["val", "test"], help="THUMOS14 split (011: test is held out)")
     ap.add_argument("--ucf-root", default="data/ucf101")
     ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES))
     ap.add_argument("--head", required=True, help="linear probe head .pt from eval_ucf101.py")
@@ -101,7 +102,7 @@ def main() -> None:
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     gpu = torch.cuda.get_device_name(0) if device == "cuda" else f"cpu ({platform.processor() or 'unknown'})"
     ucf = UCF101(args.ucf_root, "train", 1, limit=1)  # only for the class list
-    ds = THUMOS14(args.root, "val")
+    ds = THUMOS14(args.root, args.split)
     if args.limit:
         ds.videos = ds.videos[: args.limit]
     missing = [c for c in ds.classes if c not in ucf.class_to_idx]
@@ -182,7 +183,7 @@ def main() -> None:
                     n += 1
                     logged = sname + (args.tag if sname.startswith("kf-") else "")
                     f.write(json.dumps({
-                        "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone,
+                        "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "split": args.split, "root": args.root,
                         "sampler": logged, "budget": budget,
                         "refine_ms": getattr(sampler, "last_refine_ms", 0.0), "video": uv.video_id, "duration_s": duration,
                         "num_frames": nf, "action_fraction": uv.action_fraction(duration),

@@ -34,6 +34,7 @@ BACKBONES = {
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="data/thumos14")
+    ap.add_argument("--split", default="val", choices=["val", "test"], help="THUMOS14 split (011: test is held out)")
     ap.add_argument("--ucf-root", default="data/ucf101")
     ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES))
     ap.add_argument("--head", required=True)
@@ -51,7 +52,7 @@ def main() -> None:
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     gpu = torch.cuda.get_device_name(0) if device == "cuda" else f"cpu ({platform.processor() or 'unknown'})"
     ucf = UCF101(args.ucf_root, "train", 1, limit=1)
-    ds = THUMOS14(args.root, "val")
+    ds = THUMOS14(args.root, args.split)
     if args.limit:
         ds.videos = ds.videos[: args.limit]
     sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
@@ -132,7 +133,7 @@ def main() -> None:
                 errs.append(total - post.predicted_ms)
                 chosen_cfgs.append(str(post.config))
                 f.write(json.dumps({
-                    "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone,
+                    "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "split": args.split, "root": args.root,
                     "sampler": f"sched@{budget:.0f}", "budget": int(budget), "video": uv.video_id,
                     "duration_s": duration, "labels": sorted(uv.classes), "pred": pred_cls, "correct": bool(ok),
                     "hit_rate": hit, "pre_config": str(pre.config), "config": str(post.config),
