@@ -53,12 +53,13 @@ On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear prob
 | oracle (sees the annotations) | 0.890 | 0.925 | 0.955 |
 
 Given a budget in **milliseconds** instead of frames, the scheduler calibrates a cost model on the machine in
-6 s and picks frames, refinement and stride itself: 0.855 at 100 ms, 0.910 at 150, 0.945 at 200 and above
+6 s and picks frames, refinement and stride itself: 0.855 at 100 ms, 0.960 at 150, 0.945 at 200 and above
 (`docs/results/thumos14_scheduler.md`). On a CPU-only host it picks different configurations at every budget.
 
-On the 212 **held-out** THUMOS14 test videos, which no head was trained on, the same runtime reaches 0.868 / 0.901 /
-0.915 at 4 / 8 / 16 frames against uniform 0.769 / 0.816 / 0.858 and the oracle's 0.863 / 0.873 / 0.925
-(`docs/results/thumos14_generality.md`). Resolution and codec do not change accuracy; keyframe density does.
+On the 212 **held-out** THUMOS14 test videos, which no head was trained on, the same runtime reaches 0.863 / 0.901 /
+0.915 at 4 / 8 / 16 frames in 149 / 167 / 165 ms, against uniform 0.764 / 0.816 / 0.858 in 156 / 278 / 503 ms and the
+oracle's 0.863 / 0.873 / 0.925 (`docs/results/thumos14_generality.md`). Resolution and codec (H.264, HEVC, VP9) do not
+change accuracy; keyframe density changes the decode cost of every sampler, and the scheduler follows it.
 
 
 - [x] `Video` with lazy decoding, `FrameBatch`, `ActionOutput`

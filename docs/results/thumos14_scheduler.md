@@ -80,3 +80,24 @@ accuracy table the scheduler orders by comes from the 200-video GPU runs.)
 - p90 ≤ 1.15 × budget: ✔ at 200 (214 ≤ 230) and 300; ✗ at 150 (189).
 - Mean absolute prediction error ≤ 15 ms: ✗ (36–38 ms, host jitter); bias is −11 to −16 ms.
 - Slow tier chooses visibly different configurations: ✔.
+
+## Re-run after the 011 erratum (2026-11-05)
+
+The benchmark fix lets the post-scan plan switch refinement on; the cost model was re-fitted
+(w = [63.0, 0, 0.42, 0.14, 0.09, 0], margin 22.5 ms). Same 200 videos, same GPU.
+
+| budget | chosen configurations | top-1 | within budget | p50 ms | p90 ms | prediction error mean / MAE |
+|---|---|---|---|---|---|---|
+| 100 | 4f ×200 | 0.855 | 0.24 | 126 | 193 | −12 / 39 |
+| 125 | 4f ×192, 16f(+refine) ×7, 8f ×1 | 0.855 | 0.49 | 125 | 187 | −14 / 38 |
+| 150 | 16f ×182, 16f+refine/3 ×12, 16f+refine/6 ×6 | **0.960** | 0.64 | 137 | 192 | −9 / 35 |
+| 200 | 16f+refine/3 ×200 | 0.945 | 0.82 | 155 | 209 | −14 / 36 |
+| 300 | 16f+refine/3 ×200 | 0.945 | 0.99 | 155 | 213 | −14 / 37 |
+
+The 150 ms point changed from 0.910 to 0.960: the re-fitted model predicts 16f (0.14 ms per model frame
+instead of 0.09 made the difference between fitting and not), so the scheduler takes 16 frames for 182 videos
+and refinement for the 18 whose scan came back short, which is exactly the post-scan behaviour the erratum had
+hidden. 0.960 is above the hindsight-best static configuration (16f, 0.935), i.e. the per-video switch adds
+accuracy, not only safety. Finding 2 above (the 2.5-point loss at 150 ms) is therefore withdrawn; the sensitivity
+it describes is real (two calibrations 0.05 ms/frame apart choose different configurations in the flat band),
+and is the reason to keep margin at 1.0.

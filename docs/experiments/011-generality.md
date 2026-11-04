@@ -1,6 +1,6 @@
 # 011 · Generality: held-out split, resolution, codec, keyframe density
 
-**Date:** 2026-11-03 · **Status:** done (CPU tier; GPU latency rerun and VP9 full rerun pending) · **Results:** [`docs/results/thumos14_generality.md`](../results/thumos14_generality.md)
+**Date:** 2026-11-03 · **Status:** done (CPU tier 2026-11-04, GPU tier 2026-11-05) · **Results:** [`docs/results/thumos14_generality.md`](../results/thumos14_generality.md)
 
 ## Motivation (from 009 and 010)
 Every number so far is 200 THUMOS14 validation videos at 320×180 H.264 with the encoder's default keyframe
@@ -74,8 +74,12 @@ refinement stays above uniform at 4 frames.
   drops kf-learned without refinement to 0.760 / 0.820 / 0.880, below uniform at 4 and 16; refinement recovers
   0.820 / 0.880 / 0.940.
 - **Erratum:** the scheduler benchmark could log a post-scan switch into refinement without running it (8 + 18
-  rows in 010 at 125 / 150 ms; all GOP 900 scheduler rows here). Fixed; the 010 budgets 125 and 150 are re-run
-  when the GPU is free.
+  rows in 010 at 125 / 150 ms; all GOP 900 scheduler rows here). Fixed and re-run on the GPU (010 at 150 ms is
+  now 0.960; see `thumos14_scheduler.md`).
+- **GPU tier (2026-11-05):** test split 0.863 / 0.901 / 0.915 at 149 / 167 / 165 ms (uniform 156 / 278 / 503);
+  VP9 with the fixed scan 0.900 / 0.920 / 0.920; at 1080p the scheduler drops to 4 frames to hold 150 ms; on
+  GOP 30 every sampler is 4–10× cheaper to decode (uniform-16 46 ms) and the scheduler fits 16f+refine/3 in
+  56 ms; on GOP 900 it reaches 0.940 at 83 ms with refinement.
 
 ## Decision
 - The learned head ships as the default scorer: it holds on a split it never saw. The fold-average head is what
@@ -86,5 +90,5 @@ refinement stays above uniform at 4 frames.
 - The scan should report keyframe density, and the scheduler should treat "fewer than ~2 keyframes per
   minute" as a signal to prefer refinement over frames; that is a small follow-up inside R4 (robustness), where
   VP9 now also has a regression test.
-- A second domain (Charades) is 012. GPU reruns (latency tables, VP9 full run, 010 erratum budgets) are queued
-  behind the GPU being freed.
+- A second domain (Charades) is 012. Keyframe density is a property the scan already measures; the scheduler
+  should expose it (and the per-file seek cost) as cost-model features: follow-up in R4.

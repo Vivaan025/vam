@@ -104,3 +104,49 @@ than fall; the budgets 125 and 150 will be re-run when the GPU is free.
   VP9, where the scan itself broke; fixed, full rerun pending.
 - H3 (keyframe density): confirmed in both directions. Dense keyframes raise hit rate and scan cost; sparse
   keyframes defeat the scan and refinement is what recovers it.
+
+## GPU rerun (2026-11-05, RTX 5090 free again; scan fix and benchmark fix applied)
+
+Accuracies match the CPU run to the third decimal except where noted. Latencies are now on the same tier as
+every earlier result (007–010). Raw rows: `results/thumos14_*_gpu.jsonl` on the server.
+
+### Held-out test split, 212 videos, ms per video
+
+| frames | uniform | kf-clip | kf-learned | kf-clip + refine | kf-learned + refine | oracle |
+|---|---|---|---|---|---|---|
+| 4 | 0.764 @ 156 | 0.816 @ 140 | 0.835 @ 137 | 0.849 @ 151 | **0.863 @ 149** | 0.863 |
+| 8 | 0.816 @ 278 | 0.887 @ 152 | 0.887 @ 150 | 0.906 @ 168 | **0.901 @ 167** | 0.873 |
+| 16 | 0.858 @ 503 | 0.910 @ 154 | 0.920 @ 152 | 0.906 @ 167 | **0.915 @ 165** | 0.925 |
+
+The test videos are shorter on average (typical keyframe count 11 vs 25), so the runtime sits at 137–167 ms
+rather than the 143–153 ms of validation; uniform is unchanged at 156 / 278 / 503. Scheduler on test: 150 ms →
+16f for 207 of 212 (0.915, p50 142, within 0.54); 200 ms → 16f+refine/3 for all (0.915, p50 165, within 0.73).
+
+### Variant roots, 50 validation videos, kf-learned + refine unless stated, ms per video
+
+| root | kf-learned 4 / 8 / 16 | + refine 4 / 8 / 16 | uniform-16 ms | scheduler @150 → top-1, p50 | scheduler @200 → top-1, p50 |
+|---|---|---|---|---|---|
+| original | 0.940 / 0.920 / 0.960 @ 123 / 120 / 127 | 0.920 / 0.920 / 0.880 @ 148 / 156 / 140 | 462 | 4f ×37, 16f+r ×10 → 0.960, 112 | 16f+r/3 → 0.900, 136 |
+| H.264 1080p | 0.840 / 0.920 / 0.960 @ 207 / 267 / 285 | 0.880 / 0.880 / 0.920 @ 350 / 436 / 439 | 487 | 4f ×50 → 0.840, 183 | 4f ×39, 8f ×11 → 0.840, 186 |
+| HEVC 720p | 0.920 / 0.880 / 0.920 @ 161 / 179 / 185 | 0.880 / 0.920 / 0.880 @ 248 / 281 / 277 | 643 | 4f ×29, 8f ×20 → 0.920, 149 | 16f ×26, 4f ×16, 8f ×7 → 0.920, 161 |
+| **VP9 720p (fixed scan)** | 0.900 / 0.880 / 0.920 @ 133 / 134 / 141 | 0.900 / 0.920 / 0.920 @ 219 / 229 / 228 | 473 | 16f ×34, 4f ×11 → 0.920, 131 | 16f ×31, 16f+r/6 ×15 → 0.900, 159 |
+| GOP 30 (1 s) | 0.940 / 0.960 / 0.940 @ 57 / 55 / 54 | 0.940 / 0.960 / 0.940 @ 63 / 61 / 59 | 46 | 16f+r/3 ×50 → 0.940, 56 | same, 56 |
+| GOP 900 (30 s) | 0.760 / 0.820 / 0.880 @ 69 / 68 / 70 | 0.820 / 0.880 / 0.920 @ 82 / 83 / 81 | 283 | 16f+r/3 ×48 → 0.940, 83 | 16f+r/3 ×50 → 0.940, 88 |
+
+Additional findings from the GPU tier:
+
+6. **VP9 is now a first-class input.** With the fixed scan the learned sampler reaches 0.900 / 0.920 / 0.920
+   with refinement at ~225 ms (OpenCV's VP9 window decode is slower than its H.264 path: refinement costs +90 ms
+   here against +25 ms on H.264). Without refinement it is 133–141 ms, the same as H.264.
+7. **HD input moves the frontier, and the scheduler reacts.** At 1080p the window decode is 2–3× dearer
+   (refine 350–440 ms), so at a 150 ms budget the scheduler drops to 4 frames for every video and at 200 ms to
+   4–8 frames. It keeps the budget (p50 183–186 ms) at the cost of accuracy (0.840); no static configuration
+   does better under 200 ms on this root. Uniform-16 costs 487 ms.
+8. **Keyframe density sets the decode cost of *every* sampler, not just ours.** On the GOP 30 root uniform-16
+   costs 46 ms (seeks land on a keyframe) against 462 ms on the original and 283 ms on GOP 900; the learned
+   sampler is 54–63 ms there and the scheduler fits 16f+refine/3 into 150 ms for all 50 videos with a p90 of
+   76 ms. On GOP 900 refinement is cheap (windows are capped at 5 s) and the scheduler chooses it for 48 of 50,
+   reaching 0.940 at 83 ms, the same accuracy as uniform-16 at a quarter of its cost.
+9. **Prediction error is 8–18 ms MAE on the re-encoded roots and 35–40 ms on the originals.** The originals
+   are the high-bitrate broadcast files; their seek cost varies per file more than the model can see without a
+   per-file feature (the open item from 010).

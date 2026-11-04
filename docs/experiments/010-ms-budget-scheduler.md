@@ -82,8 +82,9 @@ the chosen configurations visibly different from the 5090's.
 
 **Erratum (2026-11-04, found in 011):** the benchmark only gave the sampler the refinement scorer when the
 pre-scan plan chose refinement, so post-scan switches *into* refinement were logged but not run: 8 videos at
-125 ms and 18 at 150 ms (none at 100 / 200 / 300, where pre = post). Fixed in `benchmarks/eval_scheduler.py`;
-budgets 125 and 150 to be re-run on the GPU.
+125 ms and 18 at 150 ms (none at 100 / 200 / 300, where pre = post). Fixed in `benchmarks/eval_scheduler.py`
+and re-run on the GPU 2026-11-05: 0.855 / 0.855 / **0.960** / 0.945 / 0.945 at 100 / 125 / 150 / 200 / 300 ms (the
+150 ms point now beats the hindsight-best static 16f at 0.935); see the results file.
 
 ## Decision
 - `vam.runtime.Scheduler` is the budget-facing entry point; `calibrate` runs once per machine. Margin stays 1.0:
