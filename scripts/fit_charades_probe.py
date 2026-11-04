@@ -30,7 +30,10 @@ BACKBONES = {
 def extract(extractor, ds, cache: Path, limit: int | None = None):
     if cache.exists():
         d = torch.load(cache)
-        return d["x"], d["y"], d["ids"]
+        x = d["x"]
+        if x.dim() == 1:  # extractor.features returns one (dim,) vector per video; torch.cat flattened an older cache
+            x = x.view(len(d["ids"]), -1)
+        return x, d["y"], d["ids"]
     sampler = UniformSampler(extractor.default_num_frames)
     xs, ys, ids = [], [], []
     vids = ds.videos[:limit] if limit else ds.videos
@@ -42,7 +45,7 @@ def extract(extractor, ds, cache: Path, limit: int | None = None):
             print(f"skip {uv.video_id}: {e}", flush=True)
             continue
         try:
-            xs.append(extractor.features(sampler(v)).float().cpu())
+            xs.append(extractor.features(sampler(v)).float().cpu().reshape(-1))
         except Exception as e:
             print(f"skip {uv.video_id}: {e}", flush=True)
             continue
@@ -55,7 +58,7 @@ def extract(extractor, ds, cache: Path, limit: int | None = None):
         ids.append(uv.video_id)
         if (i + 1) % 200 == 0:
             print(f"  {i + 1}/{len(vids)}  ({(time.time() - t0) / (i + 1) * 1000:.0f} ms/video)", flush=True)
-    x, y = torch.cat(xs), torch.stack(ys)
+    x, y = torch.stack(xs), torch.stack(ys)
     cache.parent.mkdir(parents=True, exist_ok=True)
     torch.save({"x": x, "y": y, "ids": ids}, cache)
     return x, y, ids
