@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | `vam.data.Charades` (THUMOS14-shaped dataset over the Charades CSVs), `scripts/download_charades.py`, test | `vam/data/charades.py`, `scripts/download_charades.py`, `tests/test_charades.py` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-05 | Plan for experiment 012 (Charades as a second domain: headroom, scorer transfer, runtime) | `docs/experiments/012-charades-second-domain.md` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-04 | `KeyframeSampler(refine=True)` is the default: refinement with the same scorer unless `refine=False`; benchmarks unchanged (they pass the scorer or `None` explicitly) | `vam/sampling/keyframe.py` | [011](experiments/011-generality.md) |
 | 2026-11-04 | Results of experiment 011 (CPU tier): learned head holds on the held-out test split, resolution / codec neutral, keyframe density matters; erratum in the scheduler benchmark fixed (planner can switch refinement on); README v0.5 | `docs/results/thumos14_generality.md`, `benchmarks/eval_scheduler.py`, `docs/experiments/010-*.md`, `README.md` | [011](experiments/011-generality.md) |
