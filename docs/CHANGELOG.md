@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | `--dataset charades` on both benchmarks (head over the dataset classes instead of the UCF101 probe); `scripts/fit_charades_probe.py` (uniform-16 features, one-vs-rest head, top-1-in-labels + mAP) | `benchmarks/`, `scripts/fit_charades_probe.py` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-05 | `vam.data.Charades` (THUMOS14-shaped dataset over the Charades CSVs), `scripts/download_charades.py`, test | `vam/data/charades.py`, `scripts/download_charades.py`, `tests/test_charades.py` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-05 | Plan for experiment 012 (Charades as a second domain: headroom, scorer transfer, runtime) | `docs/experiments/012-charades-second-domain.md` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-04 | `KeyframeSampler(refine=True)` is the default: refinement with the same scorer unless `refine=False`; benchmarks unchanged (they pass the scorer or `None` explicitly) | `vam/sampling/keyframe.py` | [011](experiments/011-generality.md) |

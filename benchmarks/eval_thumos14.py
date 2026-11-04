@@ -29,7 +29,7 @@ import numpy as np
 import torch
 
 import vam
-from vam.data import THUMOS14, UCF101, UntrimmedVideo
+from vam.data import THUMOS14, UCF101, Charades, UntrimmedVideo
 from vam.models.probe import HFFeatureExtractor, LinearProbe
 from vam.sampling import (ClipScorer, KeyframeSampler, LearnedScorer, MotionSampler, OracleKeyframeScorer, Sampler,
                           UniformSampler)
@@ -71,8 +71,9 @@ class OracleSampler(Sampler):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default="thumos14", choices=["thumos14", "charades"], help="012: charades needs a head from scripts/fit_charades_probe.py")
     ap.add_argument("--root", default="data/thumos14")
-    ap.add_argument("--split", default="val", choices=["val", "test"], help="THUMOS14 split (011: test is held out)")
+    ap.add_argument("--split", default="val", choices=["val", "test", "train"], help="THUMOS14: val | test (011, held out); Charades: train | test")
     ap.add_argument("--ucf-root", default="data/ucf101")
     ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES))
     ap.add_argument("--head", required=True, help="linear probe head .pt from eval_ucf101.py")
@@ -101,21 +102,27 @@ def main() -> None:
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     gpu = torch.cuda.get_device_name(0) if device == "cuda" else f"cpu ({platform.processor() or 'unknown'})"
-    ucf = UCF101(args.ucf_root, "train", 1, limit=1)  # only for the class list
-    ds = THUMOS14(args.root, args.split)
+    if args.dataset == "charades":
+        ds = Charades(args.root, args.split)
+        head_classes = ds.classes                       # the head is fitted on Charades train (012)
+        sub_idx = torch.arange(len(ds.classes))
+    else:
+        ucf = UCF101(args.ucf_root, "train", 1, limit=1)  # only for the class list
+        ds = THUMOS14(args.root, args.split)
+        missing = [c for c in ds.classes if c not in ucf.class_to_idx]
+        if missing:
+            raise SystemExit(f"THUMOS classes not in UCF101: {missing}")
+        head_classes = ucf.classes
+        sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     if args.limit:
         ds.videos = ds.videos[: args.limit]
-    missing = [c for c in ds.classes if c not in ucf.class_to_idx]
-    if missing:
-        raise SystemExit(f"THUMOS classes not in UCF101: {missing}")
-    sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     print(gpu, "|", args.backbone, "|", ds, flush=True)
 
     need_clip = any(x in args.samplers for x in ("kf-clip", "kf-learned"))
     clip_scorer = ClipScorer(ds.classes, device=device, half=not args.clip_fp32) if need_clip else None
     learned = LearnedScorer.load(args.scorer_head, clip_scorer) if "kf-learned" in args.samplers else None
     extractor = HFFeatureExtractor(BACKBONES[args.backbone], device=device)
-    probe = LinearProbe(extractor, ucf.num_classes, ucf.classes).load_head(args.head)
+    probe = LinearProbe(extractor, len(head_classes), head_classes).load_head(args.head)
 
     kf_opts = dict(window=args.kf_window, alloc=args.kf_alloc, temperature=args.kf_temp,
                    refine_stride=args.kf_refine_stride, decode_backend=args.decode_backend)
@@ -183,7 +190,7 @@ def main() -> None:
                     n += 1
                     logged = sname + (args.tag if sname.startswith("kf-") else "")
                     f.write(json.dumps({
-                        "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "split": args.split, "root": args.root,
+                        "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "dataset": args.dataset, "split": args.split, "root": args.root,
                         "sampler": logged, "budget": budget,
                         "refine_ms": getattr(sampler, "last_refine_ms", 0.0), "video": uv.video_id, "duration_s": duration,
                         "num_frames": nf, "action_fraction": uv.action_fraction(duration),

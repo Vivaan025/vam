@@ -20,7 +20,7 @@ import numpy as np
 import torch
 
 import vam
-from vam.data import THUMOS14, UCF101
+from vam.data import THUMOS14, UCF101, Charades
 from vam.models.probe import HFFeatureExtractor, LinearProbe
 from vam.runtime.scheduler import Config, Features, Scheduler, calibrate, features_for
 from vam.sampling import ClipScorer, KeyframeSampler, LearnedScorer
@@ -33,8 +33,9 @@ BACKBONES = {
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--dataset", default="thumos14", choices=["thumos14", "charades"], help="012: charades needs a head from scripts/fit_charades_probe.py")
     ap.add_argument("--root", default="data/thumos14")
-    ap.add_argument("--split", default="val", choices=["val", "test"], help="THUMOS14 split (011: test is held out)")
+    ap.add_argument("--split", default="val", choices=["val", "test", "train"], help="THUMOS14: val | test (011, held out); Charades: train | test")
     ap.add_argument("--ucf-root", default="data/ucf101")
     ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES))
     ap.add_argument("--head", required=True)
@@ -51,17 +52,23 @@ def main() -> None:
 
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
     gpu = torch.cuda.get_device_name(0) if device == "cuda" else f"cpu ({platform.processor() or 'unknown'})"
-    ucf = UCF101(args.ucf_root, "train", 1, limit=1)
-    ds = THUMOS14(args.root, args.split)
+    if args.dataset == "charades":
+        ds = Charades(args.root, args.split)
+        head_classes = ds.classes
+        sub_idx = torch.arange(len(ds.classes))
+    else:
+        ucf = UCF101(args.ucf_root, "train", 1, limit=1)
+        ds = THUMOS14(args.root, args.split)
+        head_classes = ucf.classes
+        sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     if args.limit:
         ds.videos = ds.videos[: args.limit]
-    sub_idx = torch.tensor([ucf.class_to_idx[c] for c in ds.classes])
     print(gpu, "|", args.backbone, "|", ds, flush=True)
 
     clip = ClipScorer(ds.classes, device=device)
     learned = LearnedScorer.load(args.scorer_head, clip)
     extractor = HFFeatureExtractor(BACKBONES[args.backbone], device=device)
-    probe = LinearProbe(extractor, ucf.num_classes, ucf.classes).load_head(args.head)
+    probe = LinearProbe(extractor, len(head_classes), head_classes).load_head(args.head)
 
     def make_sampler(cfg: Config, video_id: str, planner=None) -> KeyframeSampler:
         sc = learned.for_video(video_id)
@@ -136,7 +143,7 @@ def main() -> None:
                 errs.append(total - post.predicted_ms)
                 chosen_cfgs.append(str(post.config))
                 f.write(json.dumps({
-                    "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "split": args.split, "root": args.root,
+                    "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "dataset": args.dataset, "split": args.split, "root": args.root,
                     "sampler": f"sched@{budget:.0f}", "budget": int(budget), "video": uv.video_id,
                     "duration_s": duration, "labels": sorted(uv.classes), "pred": pred_cls, "correct": bool(ok),
                     "hit_rate": hit, "pre_config": str(pre.config), "config": str(post.config),
