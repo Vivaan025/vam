@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | `scripts/train_scorer.py --dataset charades --split test --limit N`: retrain the keyframe scorer on another dataset with the same 5-fold-by-video protocol | `scripts/train_scorer.py` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-05 | GPU tier of experiment 011 (test split 0.863 / 0.901 / 0.915 at 149 / 167 / 165 ms; VP9 fixed; 1080p and keyframe-density scheduler behaviour) and 010 re-run after the erratum (150 ms → 0.960) | `docs/results/thumos14_generality.md`, `docs/results/thumos14_scheduler.md`, `README.md` | [011](experiments/011-generality.md) |
 | 2026-11-05 | `--dataset charades` on both benchmarks (head over the dataset classes instead of the UCF101 probe); `scripts/fit_charades_probe.py` (uniform-16 features, one-vs-rest head, top-1-in-labels + mAP) | `benchmarks/`, `scripts/fit_charades_probe.py` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-05 | `vam.data.Charades` (THUMOS14-shaped dataset over the Charades CSVs), `scripts/download_charades.py`, test | `vam/data/charades.py`, `scripts/download_charades.py`, `tests/test_charades.py` | [012](experiments/012-charades-second-domain.md) |

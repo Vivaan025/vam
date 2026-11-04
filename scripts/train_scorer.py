@@ -17,14 +17,17 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from vam.data import THUMOS14
+from vam.data import THUMOS14, Charades
 from vam.runtime.scan import scan_keyframes
 from vam.sampling import ClipScorer
 from vam.sampling.learned import ScorerHead, build_features, gap_window_targets
 
 
-def cache_features(root: str, out: Path, device: str, thumb: int) -> dict:
-    ds = THUMOS14(root, "val")
+def cache_features(root: str, out: Path, device: str, thumb: int, dataset: str = "thumos14", split: str = "val",
+                   limit: int | None = None) -> dict:
+    ds = Charades(root, split) if dataset == "charades" else THUMOS14(root, split)
+    if limit:
+        ds.videos = ds.videos[:limit]
     clip = ClipScorer(ds.classes, device=device)
     feats = {}
     t0 = time.time()
@@ -115,6 +118,9 @@ def evaluate(head, x, y, vid, device) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="data/thumos14")
+    ap.add_argument("--dataset", default="thumos14", choices=["thumos14", "charades"], help="012: retrain the scorer on another dataset")
+    ap.add_argument("--split", default="val")
+    ap.add_argument("--limit", type=int, default=None, help="cache features for the first N videos only (012: the 1,000-video Charades test subset)")
     ap.add_argument("--cache", default="results/cache/scorer_feats.pt")
     ap.add_argument("--thumb", type=int, default=112)
     ap.add_argument("--kind", default="mlp", choices=["ridge", "mlp", "context"])
@@ -136,7 +142,7 @@ def main() -> None:
         feats = torch.load(cache, map_location="cpu", weights_only=False)["feats"]
         print(f"loaded {len(feats)} videos from {cache}")
     else:
-        feats = cache_features(args.root, cache, device, args.thumb)
+        feats = cache_features(args.root, cache, device, args.thumb, args.dataset, args.split, args.limit)
 
     context = args.context if args.kind == "context" else 0
     use_zs = not args.no_zeroshot
