@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | Plan for experiment 012 (Charades as a second domain: headroom, scorer transfer, runtime) | `docs/experiments/012-charades-second-domain.md` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-04 | `KeyframeSampler(refine=True)` is the default: refinement with the same scorer unless `refine=False`; benchmarks unchanged (they pass the scorer or `None` explicitly) | `vam/sampling/keyframe.py` | [011](experiments/011-generality.md) |
 | 2026-11-04 | Results of experiment 011 (CPU tier): learned head holds on the held-out test split, resolution / codec neutral, keyframe density matters; erratum in the scheduler benchmark fixed (planner can switch refinement on); README v0.5 | `docs/results/thumos14_generality.md`, `benchmarks/eval_scheduler.py`, `docs/experiments/010-*.md`, `README.md` | [011](experiments/011-generality.md) |
 | 2026-11-03 | Keyframe scan feeds only keyframe packets to the decoder (demux + `is_keyframe`): libvpx ignores `skip_frame=NONKEY`, so VP9 files returned every frame as a keyframe (5,000 per video, 34 s select); now 40 keyframes in 119 ms, and H.264 / HEVC scans 25–30 % faster. Per-codec regression test | `vam/runtime/scan.py`, `tests/test_keyframe.py` | [011](experiments/011-generality.md) |
