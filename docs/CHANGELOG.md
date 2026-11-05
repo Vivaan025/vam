@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | Plan for experiment 014 (model coverage, roadmap R5: torchvision video classifiers, `ActionPolicy` + OpenVLA-7B adapter, policy benchmark) | `docs/experiments/014-model-coverage.md` | [014](experiments/014-model-coverage.md) |
 | 2026-11-05 | Results of experiment 013 (robustness, R4 done): errors, deadlock fix, uniform fallback measured on Charades and THUMOS14 | `docs/results/robustness.md`, `README.md`, `docs/roadmap.md` | [013](experiments/013-robustness.md) |
 | 2026-11-05 | Window-coverage fallback: `KeyframeSampler(max_coverage=0.5)` and `Scheduler.planner(max_coverage=0.5)` answer uniform when the chosen windows would cover more than half the video (the flat-score rule alone fired on 71 of 1,000 Charades clips) | `vam/sampling/keyframe.py`, `vam/runtime/scheduler.py`, `tests/test_robustness.py` | [013](experiments/013-robustness.md) |
 | 2026-11-05 | Scan worker pool uses `forkserver` (a `fork()` after thread pools / torch / OpenCV threads deadlocked two test runs on the server) and the scan has a 120 s timeout that raises `ScanError` and discards the pool; `load_video` counts frames by grabbing when the container reports 0 (still images) | `vam/runtime/scan.py`, `vam/core.py`, `tests/test_robustness.py` | [013](experiments/013-robustness.md) |
