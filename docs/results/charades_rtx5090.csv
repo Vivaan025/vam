@@ -1,0 +1,37 @@
+sampler,frames,n,top1,hit_rate,ms_per_video
+uniform,4,1000,0.379,0.95,44
+uniform,8,1000,0.465,0.95,56
+uniform,16,1000,0.572,0.95,47
+oracle,4,1000,0.356,1.00,40
+oracle,8,1000,0.449,1.00,46
+oracle,16,1000,0.570,1.00,50
+kf-clip,4,1000,0.375,0.95,48
+kf-clip,8,1000,0.455,0.94,55
+kf-clip,16,1000,0.531,0.94,57
+kf-learned,4,1000,0.359,0.94,47
+kf-learned,8,1000,0.462,0.94,55
+kf-learned,16,1000,0.555,0.94,57
+kf-clip:refine,4,1000,0.373,0.95,73
+kf-clip:refine,8,1000,0.441,0.94,78
+kf-clip:refine,16,1000,0.536,0.94,78
+kf-learned:refine,4,1000,0.348,0.94,74
+kf-learned:refine,8,1000,0.457,0.94,79
+kf-learned:refine,16,1000,0.531,0.94,78
+kf-learned:charades-head,4,1000,0.339,0.96,48
+kf-learned:charades-head,8,1000,0.416,0.96,50
+kf-learned:charades-head,16,1000,0.498,0.96,54
+kf-learned:charades-head+refine,4,1000,0.370,0.96,74
+kf-learned:charades-head+refine,8,1000,0.434,0.96,74
+kf-learned:charades-head+refine,16,1000,0.495,0.96,74
+sched@100,-,1000,0.517,-,83
+sched@150,-,1000,0.513,-,115
+sched@200,-,1000,0.513,-,116
+coverage<0.5 subset: uniform,4,28,0.179,,
+coverage<0.5 subset: uniform,8,28,0.250,,
+coverage<0.5 subset: uniform,16,28,0.357,,
+coverage<0.5 subset: oracle,4,28,0.286,,
+coverage<0.5 subset: oracle,8,28,0.179,,
+coverage<0.5 subset: oracle,16,28,0.286,,
+coverage<0.5 subset: kf-learned:refine,4,28,0.179,,
+coverage<0.5 subset: kf-learned:refine,8,28,0.357,,
+coverage<0.5 subset: kf-learned:refine,16,28,0.393,,

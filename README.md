@@ -61,6 +61,10 @@ On the 212 **held-out** THUMOS14 test videos, which no head was trained on, the 
 oracle's 0.863 / 0.873 / 0.925 (`docs/results/thumos14_generality.md`). Resolution and codec (H.264, HEVC, VP9) do not
 change accuracy; keyframe density changes the decode cost of every sampler, and the scheduler follows it.
 
+**Where it does not help:** on Charades, where the action covers 95 % of every 30 s clip, even the oracle is no
+better than uniform sampling and neither is `vam` (`docs/results/charades.md`). Frame selection pays when actions
+are a small fraction of the video; the scheduler is a long-video tool, and a uniform fallback is on the roadmap.
+
 
 - [x] `Video` with lazy decoding, `FrameBatch`, `ActionOutput`
 - [x] `UniformSampler`, `MotionSampler`
@@ -80,7 +84,8 @@ change accuracy; keyframe density changes the decode cost of every sampler, and 
 - [x] Learned, class-free keyframe scorer: equals the oracle at 8 frames (`docs/results/thumos14_learned.md`)
 - [x] Millisecond-budget scheduler: calibrated cost model + pre/post-scan policy (`docs/results/thumos14_scheduler.md`)
 - [x] Generality within domain: held-out split, 1080p, HEVC, VP9, keyframe density (`docs/results/thumos14_generality.md`)
-- [ ] Second domain (Charades); robustness; packaging (see `docs/roadmap.md`)
+- [x] Second domain: Charades, a negative result that states the method's boundary (`docs/results/charades.md`)
+- [ ] Robustness (incl. scheduler uniform fallback); model coverage; packaging; docs (see `docs/roadmap.md`)
 - [ ] GPU windowed decode (NVDEC) — deferred past v0.1
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline

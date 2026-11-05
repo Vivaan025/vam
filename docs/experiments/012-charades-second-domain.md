@@ -1,6 +1,6 @@
 # 012 · Second domain: Charades (indoor, handheld, multi-action)
 
-**Date:** 2026-11-05 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-05 · **Status:** done · **Results:** [`docs/results/charades.md`](../results/charades.md)
 
 ## Motivation (from 011)
 011 showed the runtime holds on THUMOS14 videos it never saw, and that resolution and codec are neutral. What
@@ -47,8 +47,30 @@ of the 011 480p-equivalent, scheduler within-budget rates comparable to 010 at t
 - If H1 fails the experiment still produces a result: the boundary of where frame selection pays off,
   stated as action coverage per video, which the scheduler could read from the scan.
 
+## Changes made
+- `vam.data.Charades` (THUMOS14-shaped), `scripts/download_charades.py`, `scripts/fit_charades_probe.py`
+  (one-vs-rest head on frozen features: 0.576 top-1-in-labels / 0.227 mAP), `--dataset charades` on both
+  benchmarks, `train_scorer.py --dataset/--split/--limit`.
+
 ## Results
-*(to fill)*
+- **H1 fails, and that is the result.** Action coverage per video is 0.95 (THUMOS14: 0.29); uniform frames are
+  already inside an action 95 % of the time; the oracle is 2.3 points *below* uniform at 4 frames. There is no
+  gap for any selector to close.
+- End to end, 1,000 test videos: uniform 0.379 / 0.465 / 0.572, kf-learned 0.359 / 0.462 / 0.555, with
+  refinement 0.348 / 0.457 / 0.531, retrained head 0.339 / 0.416 / 0.498; all hit rates 0.94–0.96. Uniform
+  wins or ties at every budget.
+- H2 moot: the retrained head ranks keyframes at Spearman 0.37 vs 0.10 for zero-shot, but 97.5 % of windows are
+  hits for every scorer. H3 holds: 47–57 ms per video, scheduler calibrates in 3 s and predicts within 8 ms.
+- The scheduler picked 16f+refine everywhere (it was cheap) and lost 5.5 points to uniform-16, because its
+  accuracy ordering is THUMOS14's.
 
 ## Decision
-*(to fill)*
+- **State the boundary in the README and the pitch:** frame selection pays when action coverage is low (the
+  long-video regime the project is about) and does nothing when the action fills the clip. Coverage is the
+  variable, not domain or length.
+- **Scheduler follow-up (R4, small):** add `uniform` to the configuration table and fall back to it when the
+  scan's scores are flat / the keyframe count is tiny; log the scan's coverage estimate. Until then the
+  scheduler is documented as a long-video tool.
+- No retraining or redesign follows from this experiment. The next dataset worth running is long untrimmed
+  video with sparse actions outside sports (ActivityNet-style), which is the regime the method claims and the one
+  that would extend 011's held-out result to a new domain.
