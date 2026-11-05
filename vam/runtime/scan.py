@@ -73,8 +73,16 @@ _POOL = None
 _POOL_SIZE = 0
 
 
+SCAN_TIMEOUT_S = 120.0   # a scan that takes longer than this is a hung worker, not a long video (013)
+
+
 def _process_pool(workers: int):
-    """A persistent process pool (fork on Linux). Created lazily; grown if more workers are asked for."""
+    """A persistent process pool. Created lazily; grown if more workers are asked for.
+
+    Start method: "forkserver" where available. Plain fork copies the parent's threads' locks into the
+    child, and a child forked after a thread pool, torch or OpenCV started threads can deadlock on its first
+    decode (013: two pytest runs hung this way). The fork server is forked once from a clean process and the
+    workers fork from it, so the first scan pays one extra import of vam (~1-2 s) and later ones nothing."""
     global _POOL, _POOL_SIZE
     if _POOL is None or _POOL_SIZE < workers:
         import atexit
@@ -83,18 +91,19 @@ def _process_pool(workers: int):
 
         if _POOL is not None:
             _POOL.shutdown(wait=False)
-        ctx = mp.get_context("fork") if "fork" in mp.get_all_start_methods() else mp.get_context("spawn")
+        methods = mp.get_all_start_methods()
+        ctx = mp.get_context("forkserver" if "forkserver" in methods else "spawn")
         _POOL = ProcessPoolExecutor(workers, mp_context=ctx)
         _POOL_SIZE = workers
         atexit.register(_POOL.shutdown, wait=False)
     return _POOL
 
 
-def shutdown_pools() -> None:
+def shutdown_pools(wait: bool = True) -> None:
     """Stop the scan's worker processes (also registered with atexit). Safe to call twice."""
     global _POOL, _POOL_SIZE
     if _POOL is not None:
-        _POOL.shutdown(wait=True)
+        _POOL.shutdown(wait=wait, cancel_futures=True)
         _POOL, _POOL_SIZE = None, 0
 
 
@@ -151,16 +160,20 @@ def scan_keyframes(path: str, thumb: tuple[int, int] = (112, 112), max_keyframes
         jobs = [(path, float(edges[i]), float(edges[i + 1]), thumb, stride) for i in range(workers)]
         try:
             if backend == "process":
-                parts = list(_process_pool(workers).map(_scan_range_job, jobs))
+                parts = list(_process_pool(workers).map(_scan_range_job, jobs, timeout=SCAN_TIMEOUT_S))
             elif backend == "thread":
                 from concurrent.futures import ThreadPoolExecutor
 
                 with ThreadPoolExecutor(workers) as ex:
-                    parts = list(ex.map(_scan_range_job, jobs))
+                    parts = list(ex.map(_scan_range_job, jobs, timeout=SCAN_TIMEOUT_S))
             else:
                 raise ValueError(f"unknown backend {backend!r}")
         except ValueError:
             raise
+        except TimeoutError as e:  # concurrent.futures.TimeoutError is TimeoutError since 3.11
+            if backend == "process":
+                shutdown_pools(wait=False)
+            raise ScanError(path, f"scan exceeded {SCAN_TIMEOUT_S:.0f} s; worker pool discarded") from e
         except Exception as e:  # a worker hit a corrupt packet
             raise ScanError(path, type(e).__name__) from e
     items = sorted((x for part in parts for x in part), key=lambda x: x[0])

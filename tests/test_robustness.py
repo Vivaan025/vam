@@ -74,9 +74,28 @@ def test_png_renamed_mp4_is_a_one_frame_video(tmp_path):
     kf = scan_keyframes(p, thumb=(16, 12), workers=2, backend="thread")
     assert len(kf) == 1
     v = vam.load_video(p)
+    assert v.num_frames == 1  # OpenCV reports 0 frames for a still image; load_video counts by grabbing
     s = KeyframeSampler(4, _oracle(), refine=False)
     assert s.select(v) == [0] and s.last_fallback == "short-clip"
     v.close()
+
+
+def test_process_scan_after_threads_does_not_hang(tmp_path):
+    """013: a fork()ed worker created after thread pools exist can deadlock; the pool uses forkserver and
+    the scan has a timeout, so this returns within seconds either way."""
+    import multiprocessing as mp
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    if "forkserver" not in mp.get_all_start_methods():
+        pytest.skip("no forkserver on this platform")
+    p = _clip(str(tmp_path / "pool.mp4"), 60, gop=10)
+    with ThreadPoolExecutor(4) as ex:  # threads exist before the pool is created
+        list(ex.map(lambda i: scan_keyframes(p, thumb=(16, 12), workers=2, backend="thread"), range(4)))
+    t0 = time.time()
+    kf = scan_keyframes(p, thumb=(16, 12), workers=4, backend="process")
+    assert len(kf) >= 5 and time.time() - t0 < 60
+    shutdown_pools()
 
 
 def test_decode_error_for_impossible_indices(tmp_path):

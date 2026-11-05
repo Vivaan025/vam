@@ -145,13 +145,22 @@ def load_video(path: str) -> Video:
     if not os.path.exists(path):
         raise VideoOpenError(path, "no such file")
     cap = cv2.VideoCapture(path)
-    if not cap.isOpened() or int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) <= 0 and not cap.grab():
+    if not cap.isOpened():
         cap.release()
         raise VideoOpenError(path, "not a readable video")
+    num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if num_frames <= 0:  # still image, or a container without an index: count by grabbing (013)
+        num_frames = 0
+        while cap.grab() and num_frames < 100_000:
+            num_frames += 1
+        cap.release()
+        if num_frames == 0:
+            raise VideoOpenError(path, "no decodable frames")
+        cap = cv2.VideoCapture(path)
     return Video(
         path=path,
         fps=float(cap.get(cv2.CAP_PROP_FPS)) or 30.0,
-        num_frames=int(cap.get(cv2.CAP_PROP_FRAME_COUNT)),
+        num_frames=num_frames,
         width=int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
         height=int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
         _cap=cap,
