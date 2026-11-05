@@ -54,7 +54,9 @@ def _capture(path: str):
             cap.release()
         cap = cv2.VideoCapture(path)
         if not cap.isOpened():
-            raise IOError(f"could not open video: {path}")
+            from vam.errors import VideoOpenError
+
+            raise VideoOpenError(path)
         _LOCAL.cap, _LOCAL.path = cap, path
     return cap
 

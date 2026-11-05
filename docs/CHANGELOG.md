@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | `vam.errors` (`VamError`, `VideoOpenError`, `DecodeError`, `ScanError`) raised by `load_video`, `Video.read`, window decode and the scan; `shutdown_pools()`; `KeyframeSampler(fallback="uniform")` answers with evenly spaced frames on one-keyframe streams, flat scores, clips shorter than the budget (`last_fallback`); `Scheduler` has uniform rows and `planner()` returns a uniform plan when the scan is flat; benchmarks log `fallback`; 14 robustness tests | `vam/errors.py`, `vam/core.py`, `vam/runtime/`, `vam/sampling/keyframe.py`, `benchmarks/`, `tests/test_robustness.py` | [013](experiments/013-robustness.md) |
 | 2026-11-05 | Plan for experiment 013 (robustness, roadmap R4: defined errors, degenerate inputs give the uniform answer, scheduler uniform fallback from the scan) | `docs/experiments/013-robustness.md` | [013](experiments/013-robustness.md) |
 | 2026-11-05 | Results of experiment 012: Charades has no frame-selection headroom (coverage 0.95, oracle ≤ uniform); boundary stated; scheduler needs a uniform fallback (R4) | `docs/results/charades.md`, `README.md`, `docs/roadmap.md` | [012](experiments/012-charades-second-domain.md) |
 | 2026-11-05 | `scripts/train_scorer.py --dataset charades --split test --limit N`: retrain the keyframe scorer on another dataset with the same 5-fold-by-video protocol | `scripts/train_scorer.py` | [012](experiments/012-charades-second-domain.md) |

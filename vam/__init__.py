@@ -7,6 +7,7 @@ and the runtime that makes long-horizon and streaming inference cheap.
 """
 
 from vam.core import ActionOutput, FrameBatch, Video, load_video
+from vam.errors import DecodeError, ScanError, VamError, VideoOpenError
 from vam.sampling import MotionSampler, Sampler, UniformSampler
 from vam.stream import Stream
 from vam.runtime.profiler import Profiler, profile
@@ -20,6 +21,10 @@ __all__ = [
     "FrameBatch",
     "ActionOutput",
     "load_video",
+    "VamError",
+    "VideoOpenError",
+    "DecodeError",
+    "ScanError",
     "Sampler",
     "UniformSampler",
     "MotionSampler",

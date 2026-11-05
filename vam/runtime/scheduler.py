@@ -37,12 +37,15 @@ class Config:
     frames: int
     refine: bool
     stride: int = 6
+    uniform: bool = False   # 013: evenly spaced frames, no scan information used
 
     @property
     def segments(self) -> int:
         return max(1, min(4, self.frames // 2))
 
     def __str__(self) -> str:
+        if self.uniform:
+            return f"uniform-{self.frames}"
         return f"{self.frames}f" + (f"+refine/{self.stride}" if self.refine else "")
 
 
@@ -51,6 +54,10 @@ ACCURACY: dict[Config, float] = {
     Config(4, False): 0.855, Config(4, True, 6): 0.865, Config(4, True, 3): 0.875,
     Config(8, False): 0.905, Config(8, True, 6): 0.925, Config(8, True, 3): 0.930,
     Config(16, False): 0.935, Config(16, True, 6): 0.940, Config(16, True, 3): 0.940,
+    # uniform rows (THUMOS14 val, 002/007). Only chosen when the scan carries no information (013): on
+    # Charades (012) uniform-16 beat every keyframe configuration because every frame is action.
+    Config(4, False, uniform=True): 0.720, Config(8, False, uniform=True): 0.795,
+    Config(16, False, uniform=True): 0.880,
 }
 CONFIGS = sorted(ACCURACY, key=lambda c: (ACCURACY[c], -c.frames, c.refine, -c.stride))
 
@@ -68,6 +75,8 @@ class Features:
 
 
 def features_for(cfg: Config, K: int, window_frames: list[int]) -> Features:
+    if cfg.uniform:  # scan already paid for; uniform decode is seek-bound like a window per frame
+        return Features(K, 0, 0, cfg.frames, 0)
     wins = window_frames[: cfg.segments] or [0]
     Lmax = max(wins)
     C = int(sum(wins) / cfg.stride) if cfg.refine else 0
@@ -205,16 +214,20 @@ class Scheduler:
         self.last_plan: Optional[Plan] = None
         self.plans: list[Plan] = []
 
-    def _best(self, K: int, window_frames: list[int], stage: str) -> Plan:
+    def _best(self, K: int, window_frames: list[int], stage: str, flat: bool = False) -> Plan:
+        """Most accurate configuration that fits. With `flat` (the scan could not rank the keyframes) only
+        uniform configurations compete; otherwise uniform ones are excluded (013)."""
         fits = []
         for cfg in self.accuracy:
+            if cfg.uniform != flat:
+                continue
             ms = self.cost.predict(features_for(cfg, K, window_frames)) * self.margin
             if ms <= self.budget:
                 fits.append((self.accuracy[cfg], -cfg.frames, -cfg.stride, len(fits), cfg, ms))
         if fits:
             cfg, ms = max(fits)[-2:]
             return Plan(cfg, ms, stage, self.budget, len(fits))
-        cfg = self.min_config
+        cfg = Config(self.min_config.frames, False, uniform=True) if flat else self.min_config
         return Plan(cfg, self.cost.predict(features_for(cfg, K, window_frames)) * self.margin, stage, self.budget, 0)
 
     def pre_plan(self, duration_s: float | None = None, fps: float = 30.0) -> Plan:
@@ -224,16 +237,25 @@ class Scheduler:
         self.last_plan = plan
         return plan
 
-    def post_plan(self, K: int, window_frames: list[int]) -> Plan:
-        plan = self._best(K, sorted(window_frames, reverse=True), "post")
+    def post_plan(self, K: int, window_frames: list[int], flat: bool = False) -> Plan:
+        plan = self._best(K, sorted(window_frames, reverse=True), "post", flat)
         self.last_plan = plan
         self.plans.append(plan)
         return plan
 
-    def planner(self):
+    @staticmethod
+    def scan_is_flat(scores, flat_eps: float = 1e-3) -> bool:
+        s = np.asarray(scores, dtype=np.float64)
+        if len(s) < 2:
+            return True
+        return bool(np.std(s) < flat_eps * max(float(np.abs(s).mean()), 1e-12))
+
+    def planner(self, flat_eps: float = 1e-3):
         """Callback for KeyframeSampler(planner=...): receives (kf, scores, chosen, windows) after the scan and
-        returns (num_frames, refine_on, refine_stride)."""
+        returns (num_frames, refine_on, refine_stride, uniform). When the scan is flat (one keyframe or scores
+        the scorer cannot separate) the plan is a uniform configuration (013)."""
         def _plan(kf, scores, chosen, wins):
-            p = self.post_plan(len(kf), [e - s for s, e in wins])
-            return p.config.frames, p.config.refine, p.config.stride
+            flat = self.scan_is_flat(scores, flat_eps)
+            p = self.post_plan(len(kf), [e - s for s, e in wins], flat)
+            return p.config.frames, p.config.refine, p.config.stride, p.config.uniform
         return _plan

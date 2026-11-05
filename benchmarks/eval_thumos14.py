@@ -192,7 +192,8 @@ def main() -> None:
                     f.write(json.dumps({
                         "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "dataset": args.dataset, "split": args.split, "root": args.root,
                         "sampler": logged, "budget": budget,
-                        "refine_ms": getattr(sampler, "last_refine_ms", 0.0), "video": uv.video_id, "duration_s": duration,
+                        "refine_ms": getattr(sampler, "last_refine_ms", 0.0), "fallback": getattr(sampler, "last_fallback", None),
+                        "video": uv.video_id, "duration_s": duration,
                         "num_frames": nf, "action_fraction": uv.action_fraction(duration),
                         "labels": sorted(uv.classes), "pred": pred_cls, "correct": bool(ok), "hit_rate": hit,
                         **{f"{k}_ms": s["wall_ms"] for k, s in p.as_dict().items()},

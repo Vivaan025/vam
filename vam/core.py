@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from typing import Iterator, Optional, Sequence
 
 import cv2
+
+from vam.errors import DecodeError, VideoOpenError
 import numpy as np
 import torch
 
@@ -72,7 +74,7 @@ class Video:
         if self._cap is None or not self._cap.isOpened():
             self._cap = cv2.VideoCapture(self.path)
             if not self._cap.isOpened():
-                raise IOError(f"could not open video: {self.path}")
+                raise VideoOpenError(self.path)
         return self._cap
 
     def read(self, indices: Sequence[int], seq_threshold: int = 64) -> FrameBatch:
@@ -104,7 +106,7 @@ class Video:
             frames.append(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
             got.append(idx)
         if not frames:
-            raise ValueError("no frames could be decoded for the requested indices")
+            raise DecodeError(self.path, "none of the requested indices decoded")
         arr = torch.from_numpy(np.stack(frames))
         idx_t = torch.tensor(got, dtype=torch.long)
         return FrameBatch(arr, idx_t.float() / float(self.fps), idx_t)
@@ -138,9 +140,14 @@ class Video:
 
 
 def load_video(path: str) -> Video:
+    import os
+
+    if not os.path.exists(path):
+        raise VideoOpenError(path, "no such file")
     cap = cv2.VideoCapture(path)
-    if not cap.isOpened():
-        raise IOError(f"could not open video: {path}")
+    if not cap.isOpened() or int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) <= 0 and not cap.grab():
+        cap.release()
+        raise VideoOpenError(path, "not a readable video")
     return Video(
         path=path,
         fps=float(cap.get(cv2.CAP_PROP_FPS)) or 30.0,

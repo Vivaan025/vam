@@ -90,6 +90,14 @@ def _process_pool(workers: int):
     return _POOL
 
 
+def shutdown_pools() -> None:
+    """Stop the scan's worker processes (also registered with atexit). Safe to call twice."""
+    global _POOL, _POOL_SIZE
+    if _POOL is not None:
+        _POOL.shutdown(wait=True)
+        _POOL, _POOL_SIZE = None, 0
+
+
 def default_scan_workers() -> int:
     import os
 
@@ -118,12 +126,21 @@ def scan_keyframes(path: str, thumb: tuple[int, int] = (112, 112), max_keyframes
     """
     import av
 
-    with av.open(path) as c:
-        s = c.streams.video[0]
-        tb = float(s.time_base)
-        fps = float(s.average_rate) if s.average_rate else 30.0
-        duration = float(s.duration * tb) if s.duration else 0.0
-        num_frames = int(s.frames) if s.frames else int(round(duration * fps))
+    from vam.errors import ScanError, VideoOpenError
+
+    try:
+        with av.open(path) as c:
+            if not c.streams.video:
+                raise VideoOpenError(path, "no video stream")
+            s = c.streams.video[0]
+            tb = float(s.time_base)
+            fps = float(s.average_rate) if s.average_rate else 30.0
+            duration = float(s.duration * tb) if s.duration else 0.0
+            num_frames = int(s.frames) if s.frames else int(round(duration * fps))
+    except VideoOpenError:
+        raise
+    except Exception as e:  # av.error.* (FileNotFoundError, InvalidDataError, ...)
+        raise VideoOpenError(path, type(e).__name__) from e
 
     workers = default_scan_workers() if workers is None else max(1, int(workers))
     backend = backend or default_scan_backend()
@@ -132,20 +149,25 @@ def scan_keyframes(path: str, thumb: tuple[int, int] = (112, 112), max_keyframes
     else:
         edges = np.linspace(0.0, duration + 1.0, workers + 1)
         jobs = [(path, float(edges[i]), float(edges[i + 1]), thumb, stride) for i in range(workers)]
-        if backend == "process":
-            parts = list(_process_pool(workers).map(_scan_range_job, jobs))
-        elif backend == "thread":
-            from concurrent.futures import ThreadPoolExecutor
+        try:
+            if backend == "process":
+                parts = list(_process_pool(workers).map(_scan_range_job, jobs))
+            elif backend == "thread":
+                from concurrent.futures import ThreadPoolExecutor
 
-            with ThreadPoolExecutor(workers) as ex:
-                parts = list(ex.map(_scan_range_job, jobs))
-        else:
-            raise ValueError(f"unknown backend {backend!r}")
+                with ThreadPoolExecutor(workers) as ex:
+                    parts = list(ex.map(_scan_range_job, jobs))
+            else:
+                raise ValueError(f"unknown backend {backend!r}")
+        except ValueError:
+            raise
+        except Exception as e:  # a worker hit a corrupt packet
+            raise ScanError(path, type(e).__name__) from e
     items = sorted((x for part in parts for x in part), key=lambda x: x[0])
     if max_keyframes:
         items = items[:max_keyframes]
     if not items:
-        raise ValueError(f"no keyframes decoded from {path}")
+        raise ScanError(path, "no keyframes decoded")
     t = np.asarray([x[0] for x in items], dtype=np.float64)
     thumbs = np.stack([x[1] for x in items])
     if duration <= 0:

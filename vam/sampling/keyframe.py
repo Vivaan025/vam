@@ -45,7 +45,7 @@ class KeyframeSampler(Sampler):
                  alloc: str = "equal", temperature: float = 0.2,
                  refine: "Optional[Scorer] | bool" = True, refine_stride: int = 6, keep_edge: int = 224,
                  decode_backend: str = "thread", decode_workers: int | None = None,
-                 planner=None):
+                 planner=None, fallback: str = "uniform", flat_eps: float = 1e-3):
         super().__init__(num_frames)
         if window not in ("fixed", "gap"):
             raise ValueError(f"window must be 'fixed' or 'gap', got {window!r}")
@@ -70,7 +70,14 @@ class KeyframeSampler(Sampler):
         self.keep_edge = keep_edge
         self.decode_backend = decode_backend  # "thread" (default: OpenCV releases the GIL, 007) | "process" | "serial"
         self.decode_workers = decode_workers
-        self.planner = planner  # (kf, scores, chosen, windows) -> (num_frames, refine_on, refine_stride); 010
+        self.planner = planner  # (kf, scores, chosen, windows) -> (num_frames, refine_on, refine_stride[, uniform]); 010/013
+        # 013: when the scan carries no information (one keyframe, flat scores, clip shorter than a window)
+        # answer with evenly spaced frames instead of a worse-than-uniform guess. "none" disables.
+        if fallback not in ("uniform", "none"):
+            raise ValueError(f"fallback must be 'uniform' or 'none', got {fallback!r}")
+        self.fallback = fallback
+        self.flat_eps = flat_eps
+        self.last_fallback: str | None = None
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
         self.last_chosen: list[int] = []
@@ -119,19 +126,56 @@ class KeyframeSampler(Sampler):
             out.append((start, end))
         return out
 
+    def is_flat(self, scores: np.ndarray) -> bool:
+        """True when the scorer cannot tell the keyframes apart (012: all-action clips score flat)."""
+        if len(scores) < 2:
+            return True
+        scale = max(float(np.abs(scores).mean()), 1e-12)
+        return bool(np.std(scores) < self.flat_eps * scale)
+
+    def uniform_indices(self, video: Video) -> list[int]:
+        n = video.num_frames
+        if n <= self.num_frames:
+            return list(range(max(n, 0)))
+        return sorted(set(int(c) for c in (np.arange(self.num_frames) + 0.5) * n / self.num_frames))
+
+    def _fallback(self, video: Video, why: str) -> list[int]:
+        self.last_fallback = why
+        self.last_windows, self.last_chosen = [], []
+        self._cache = {}
+        self.last_refine_ms = 0.0
+        return self.uniform_indices(video)
+
     def select(self, video: Video) -> list[int]:
+        self.last_fallback = None
+        if video.num_frames <= self.num_frames:
+            self.last_keyframes, self.last_scores = None, None
+            return self._fallback(video, "short-clip")
         kf = scan_keyframes(video.path, thumb=self.thumb, workers=self.scan_workers, stride=self.keyframe_stride,
                             backend=self.scan_backend)
         scores = np.asarray(self.scorer(kf), dtype=np.float64)
         if scores.shape != (len(kf),):
             raise ValueError(f"scorer returned {scores.shape}, expected ({len(kf)},)")
+        self.last_keyframes, self.last_scores = kf, scores
+        flat = self.is_flat(scores)
+        if self.fallback == "uniform" and self.planner is None:
+            if len(kf) < 2:
+                return self._fallback(video, "single-keyframe")
+            if flat:
+                return self._fallback(video, "flat-scores")
+            if video.duration < self.min_window_s:
+                return self._fallback(video, "short-clip")
         chosen = self.pick_keyframes(kf, scores)
         wins = self.windows(kf, chosen, video)
         refine = self.refine
         if self.planner is not None:
-            frames, refine_on, stride = self.planner(kf, scores, chosen, wins)
+            plan = self.planner(kf, scores, chosen, wins)
+            frames, refine_on, stride = plan[:3]
+            uniform = bool(plan[3]) if len(plan) > 3 else False
             self.num_frames = int(frames)
             self.refine_stride = max(1, int(stride))
+            if uniform:
+                return self._fallback(video, "planner-uniform")
             refine = self.refine if refine_on else None
             chosen = chosen[: max(1, min(len(chosen), self.num_frames))]
             wins = wins[: len(chosen)]
@@ -172,7 +216,7 @@ class KeyframeSampler(Sampler):
                 cand_thumb.append(wf.thumbs[j])
             groups.append((i, first, len(cand_idx) - first))
         if not cand_idx:
-            return []
+            return self._fallback(video, "empty-windows")
         fps = video.fps
         cands = Keyframes(times=np.asarray(cand_idx, dtype=np.float64) / fps, indices=np.asarray(cand_idx),
                           thumbs=np.stack(cand_thumb), fps=fps, duration=video.duration, num_frames=n)
@@ -201,7 +245,9 @@ class KeyframeSampler(Sampler):
 
         idx = sorted(set(int(i) for i in indices))
         if not idx:
-            raise ValueError("no frames requested")
+            from vam.errors import DecodeError
+
+            raise DecodeError(video.path, "no frames requested")
         if not all(i in self._cache for i in idx):
             if self.decode_backend == "serial" or not self.last_windows:
                 return video.read(idx)
@@ -221,7 +267,9 @@ class KeyframeSampler(Sampler):
                     self._cache[i] = wf.frames[j]
             idx = [i for i in idx if i in self._cache]
             if not idx:
-                raise ValueError("no frames could be decoded for the requested indices")
+                from vam.errors import DecodeError
+
+                raise DecodeError(video.path, "none of the requested indices decoded")
         arr = torch.from_numpy(np.stack([self._cache[i] for i in idx]))
         idx_t = torch.tensor(idx, dtype=torch.long)
         return FrameBatch(arr, idx_t.float() / float(video.fps), idx_t)

@@ -113,6 +113,7 @@ def main() -> None:
             sched = Scheduler(budget, cost, margin=args.margin)
             correct = n = within = 0
             real, errs, chosen_cfgs = [], [], []
+            n_fallback = 0
             t_start = time.time()
             for uv in ds:
                 try:
@@ -142,6 +143,7 @@ def main() -> None:
                 real.append(total)
                 errs.append(total - post.predicted_ms)
                 chosen_cfgs.append(str(post.config))
+                n_fallback += getattr(sampler, "last_fallback", None) is not None
                 f.write(json.dumps({
                     "ts": time.time(), "host": platform.node(), "gpu": gpu, "backbone": args.backbone, "dataset": args.dataset, "split": args.split, "root": args.root,
                     "sampler": f"sched@{budget:.0f}", "budget": int(budget), "video": uv.video_id,
@@ -149,6 +151,7 @@ def main() -> None:
                     "hit_rate": hit, "pre_config": str(pre.config), "config": str(post.config),
                     "frames": post.config.frames, "refine": post.config.refine, "stride": post.config.stride,
                     "predicted_ms": post.predicted_ms, "alternatives": post.alternatives,
+                    "fallback": getattr(sampler, "last_fallback", None),
                     **{f"{k}_ms": v_ for k, v_ in ms.items()}, "total_ms": total,
                 }) + "\n")
             f.flush()
@@ -156,7 +159,7 @@ def main() -> None:
             cfg_counts = {c: chosen_cfgs.count(c) for c in sorted(set(chosen_cfgs))}
             print(f"budget={budget:4.0f}  top1={correct / max(n, 1):.3f}  within={within / max(n, 1):.2f}  "
                   f"p50={np.median(real_a):.0f} p90={np.percentile(real_a, 90):.0f} ms  "
-                  f"pred err mean={np.mean(errs):+.0f} mae={np.mean(np.abs(errs)):.0f}  configs={cfg_counts}  "
+                  f"pred err mean={np.mean(errs):+.0f} mae={np.mean(np.abs(errs)):.0f}  fallback={n_fallback}  configs={cfg_counts}  "
                   f"({(time.time() - t_start) / max(n, 1) * 1000:.0f} ms/video wall)", flush=True)
 
 
