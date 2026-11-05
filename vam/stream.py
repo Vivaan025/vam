@@ -13,6 +13,7 @@ import numpy as np
 import torch
 
 from vam.core import FrameBatch
+from vam.errors import DecodeError, VideoOpenError
 
 
 class Stream:
@@ -30,7 +31,7 @@ class Stream:
     def __iter__(self) -> Iterator[FrameBatch]:
         cap = cv2.VideoCapture(self.source)
         if not cap.isOpened():
-            raise IOError(f"could not open stream: {self.source}")
+            raise VideoOpenError(f"could not open stream: {self.source}")
         fps = float(cap.get(cv2.CAP_PROP_FPS)) or 30.0
         buf: list[np.ndarray] = []
         idxs: list[int] = []
@@ -56,6 +57,8 @@ class Stream:
                     skip = max(0, self.hop - self.window)
             if buf:
                 yield self._batch(buf, idxs, fps)
+            elif i == 0:  # opened but nothing decoded, e.g. a codec this OpenCV build lacks (AV1 in 014)
+                raise DecodeError(f"no frames decoded from {self.source}: codec unsupported or file corrupt")
         finally:
             cap.release()
 

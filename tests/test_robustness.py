@@ -51,6 +51,16 @@ def test_empty_and_garbage_files_raise(tmp_path):
             scan_keyframes(str(p), thumb=(16, 12), workers=2, backend="thread")
 
 
+def test_stream_raises_on_missing_and_undecodable(tmp_path):
+    """014: an AV1 clip on an OpenCV build without AV1 opened fine and yielded zero frames; Stream must raise."""
+    with pytest.raises(VideoOpenError):
+        list(vam.Stream(str(tmp_path / "nope.mp4"), window=4))
+    garbage = tmp_path / "garbage.mp4"
+    garbage.write_bytes(b"not a video at all" * 300)
+    with pytest.raises((VideoOpenError, DecodeError)):
+        list(vam.Stream(str(garbage), window=4))
+
+
 def test_truncated_file_raises_or_degrades(tmp_path):
     good = _clip(str(tmp_path / "good.mp4"), 60)
     data = Path(good).read_bytes()
