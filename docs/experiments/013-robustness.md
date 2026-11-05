@@ -1,6 +1,6 @@
 # 013 · Robustness: defined errors, degenerate inputs, scheduler fallback
 
-**Date:** 2026-11-05 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-05 · **Status:** done · **Results:** [`docs/results/robustness.md`](../results/robustness.md)
 
 ## Motivation (roadmap R4, and 012)
 Every benchmark so far ran on files the harness chose. A library meets files it did not choose: truncated
@@ -49,8 +49,31 @@ orphan workers. H2: indices equal `UniformSampler`'s on each degenerate input. H
   unchanged. Report the fallback rate on both datasets.
 - OpenCV and PyAV disagree on what a truncated file is; test both paths.
 
+## Changes made
+- `vam/errors.py` (`VamError`, `VideoOpenError`, `DecodeError`, `ScanError`), raised from `load_video`,
+  `Video.read`, window decode, the scan; `load_video` counts frames by grabbing when the container reports 0.
+- Scan pool: `forkserver` start method, 120 s timeout → `ScanError` + pool discarded, `shutdown_pools()`.
+- `KeyframeSampler(fallback="uniform", flat_eps=1e-3, max_coverage=0.5)`, `last_fallback`.
+- `Scheduler`: uniform rows in the table, `planner()` returns a uniform plan when the scan is flat or the
+  chosen windows cover > `max_coverage`; benchmarks log `fallback`.
+- 15 tests (`tests/test_robustness.py`), including the fork-after-threads reproduction.
+
 ## Results
-*(to fill)*
+- **H1 ✔.** Every bad input raises a documented `VamError` subclass. Running the tests on the server found a
+  real deadlock: the scan pool `fork`ed after thread pools and torch / OpenCV threads existed. Fixed with
+  `forkserver` plus a scan timeout; the same tests pass there in 2.7 s.
+- **H2 ✔.** Short clips, single-keyframe streams, flat scores, high window coverage and a planner's uniform
+  plan all return `UniformSampler`'s indices with a named reason.
+- **H3 partly ✔.** The flat-score rule alone fired on 71 of 1,000 Charades clips (0.520). Adding the
+  window-coverage rule fires on 643 and lifts the scheduler to 0.551 / 0.544 / 0.544 at 100 / 150 / 200 ms
+  (from 0.517 / 0.513 / 0.513); on those 643 clips it equals uniform-16 exactly, and the remaining 2–3-point gap
+  to uniform-16 (0.572) sits on the 357 clips it kept. THUMOS14 val / test: 0 fallbacks with the flat rule;
+  the coverage rule fires on 14 short (9–38 s) videos without hurting them.
 
 ## Decision
-*(to fill)*
+- Ship the errors, the pool change and the fallback as defaults. R4 is done.
+- The coverage threshold (0.5) is a proxy: it recovers two thirds of the Charades loss and leaves THUMOS14
+  alone. Lowering it would trade THUMOS14's short videos for Charades' long ones; the right signal is action
+  coverage itself, which needs a scorer trained to estimate it. That is a research item, not a release item;
+  logged for after v0.1.
+- Next: R5 (model coverage, incl. a policy / VLA adapter), R6 packaging + CI, R7 docs.
