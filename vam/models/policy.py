@@ -109,6 +109,9 @@ class OpenVLAPolicy(ActionPolicy):
         for f in frames:
             img = Image.fromarray(f.cpu().numpy())
             inputs = self.processor(prompt, img).to(self._dev, dtype=self.model.dtype)
+            # predict_action appends an end token to input_ids but not to attention_mask; the eager Llama path
+            # then fails on a (T) vs (T-1) causal mask. One unpadded sequence needs no mask, so drop it.
+            inputs.pop("attention_mask", None)
             a = self.model.predict_action(**inputs, unnorm_key=self.unnorm_key, do_sample=False)
             out.append(torch.as_tensor(a, dtype=torch.float32).flatten()[: self.action_dim])
         return torch.stack(out)
