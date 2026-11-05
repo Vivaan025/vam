@@ -250,12 +250,14 @@ class Scheduler:
             return True
         return bool(np.std(s) < flat_eps * max(float(np.abs(s).mean()), 1e-12))
 
-    def planner(self, flat_eps: float = 1e-3):
+    def planner(self, flat_eps: float = 1e-3, max_coverage: float = 0.5):
         """Callback for KeyframeSampler(planner=...): receives (kf, scores, chosen, windows) after the scan and
-        returns (num_frames, refine_on, refine_stride, uniform). When the scan is flat (one keyframe or scores
-        the scorer cannot separate) the plan is a uniform configuration (013)."""
+        returns (num_frames, refine_on, refine_stride, uniform). The plan is a uniform configuration when the
+        scan carries no information: one keyframe, scores the scorer cannot separate, or chosen windows that
+        would cover more than `max_coverage` of the video, so there is nothing to select (013, from 012)."""
         def _plan(kf, scores, chosen, wins):
-            flat = self.scan_is_flat(scores, flat_eps)
+            coverage = sum(e - s for s, e in wins) / max(int(getattr(kf, "num_frames", 0)), 1)
+            flat = self.scan_is_flat(scores, flat_eps) or coverage > max_coverage
             p = self.post_plan(len(kf), [e - s for s, e in wins], flat)
             return p.config.frames, p.config.refine, p.config.stride, p.config.uniform
         return _plan

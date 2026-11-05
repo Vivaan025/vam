@@ -45,7 +45,7 @@ class KeyframeSampler(Sampler):
                  alloc: str = "equal", temperature: float = 0.2,
                  refine: "Optional[Scorer] | bool" = True, refine_stride: int = 6, keep_edge: int = 224,
                  decode_backend: str = "thread", decode_workers: int | None = None,
-                 planner=None, fallback: str = "uniform", flat_eps: float = 1e-3):
+                 planner=None, fallback: str = "uniform", flat_eps: float = 1e-3, max_coverage: float = 0.5):
         super().__init__(num_frames)
         if window not in ("fixed", "gap"):
             raise ValueError(f"window must be 'fixed' or 'gap', got {window!r}")
@@ -77,6 +77,9 @@ class KeyframeSampler(Sampler):
             raise ValueError(f"fallback must be 'uniform' or 'none', got {fallback!r}")
         self.fallback = fallback
         self.flat_eps = flat_eps
+        # 013: if the chosen windows would cover more than this fraction of the video there is nothing to
+        # select (Charades: 2-4 windows of 5 s on a 30 s clip); uniform frames are the better answer.
+        self.max_coverage = max_coverage
         self.last_fallback: str | None = None
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
@@ -167,6 +170,9 @@ class KeyframeSampler(Sampler):
                 return self._fallback(video, "short-clip")
         chosen = self.pick_keyframes(kf, scores)
         wins = self.windows(kf, chosen, video)
+        coverage = sum(e - s for s, e in wins) / max(video.num_frames, 1)
+        if self.fallback == "uniform" and self.planner is None and coverage > self.max_coverage:
+            return self._fallback(video, "high-coverage")
         refine = self.refine
         if self.planner is not None:
             plan = self.planner(kf, scores, chosen, wins)

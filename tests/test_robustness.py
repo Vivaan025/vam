@@ -210,3 +210,20 @@ def test_scan_is_flat_rule():
     assert Scheduler.scan_is_flat([0.5])
     assert Scheduler.scan_is_flat([0.5, 0.5, 0.5])
     assert not Scheduler.scan_is_flat([0.1, 0.9, 0.2])
+
+
+def test_high_window_coverage_falls_back_to_uniform(tmp_path):
+    """012/013: on a 6 s clip two 5 s windows cover the whole video; selection has nothing to choose."""
+    p = _clip(str(tmp_path / "short.mp4"), 60, gop=10)  # 6 s, keyframes every 1 s
+    v = vam.load_video(p)
+    s = KeyframeSampler(4, _oracle(seg=((2.0, 3.0),)), window_s=5.0, min_window_s=5.0, window="fixed", refine=False)
+    idx = s.select(v)
+    assert s.last_fallback == "high-coverage" and idx == UniformSampler(4).select(v)
+    s = KeyframeSampler(4, _oracle(seg=((2.0, 3.0),)), window_s=1.0, window="fixed", refine=False)
+    s.select(v)
+    assert s.last_fallback is None  # two 1 s windows on 6 s: 33 % coverage, selection is meaningful
+    sched = Scheduler(10_000, _model())
+    s = KeyframeSampler(4, _oracle(seg=((2.0, 3.0),)), window_s=5.0, min_window_s=5.0, window="fixed", planner=sched.planner())
+    s.select(v)
+    assert s.last_fallback == "planner-uniform" and sched.last_plan.config.uniform
+    v.close()
