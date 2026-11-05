@@ -61,6 +61,24 @@ class FakePolicy(ActionPolicy):
         return mean_rgb @ self.w
 
 
+def _load_openvla(name: str, dtype: torch.dtype, attn_implementation: str):
+    """transformers < 5 exposes `AutoModelForVision2Seq`, which the checkpoint's `auto_map` targets; transformers 5
+    removed it, so resolve the remote class from the checkpoint's `auto_map` directly."""
+    kw = dict(trust_remote_code=True, dtype=dtype, attn_implementation=attn_implementation, low_cpu_mem_usage=True)
+    try:
+        from transformers import AutoModelForVision2Seq
+
+        return AutoModelForVision2Seq.from_pretrained(name, **kw)
+    except ImportError:
+        from transformers import AutoConfig
+        from transformers.dynamic_module_utils import get_class_from_dynamic_module
+
+        cfg = AutoConfig.from_pretrained(name, trust_remote_code=True)
+        ref = cfg.auto_map["AutoModelForVision2Seq"]
+        cls = get_class_from_dynamic_module(ref, name)
+        return cls.from_pretrained(name, config=cfg, **kw)
+
+
 class OpenVLAPolicy(ActionPolicy):
     """`openvla/openvla-7b`: one RGB frame + a language instruction -> a 7-D action
     (dx, dy, dz, droll, dpitch, dyaw, gripper) un-normalised with `unnorm_key`'s dataset statistics."""
@@ -69,15 +87,13 @@ class OpenVLAPolicy(ActionPolicy):
                  device: str | None = None, dtype: torch.dtype = torch.bfloat16,
                  attn_implementation: str = "eager", **kw):
         super().__init__(**kw)
-        from transformers import AutoModelForVision2Seq, AutoProcessor
+        from transformers import AutoProcessor
 
         dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
         if dev == "cpu":
             dtype = torch.float32
         self.processor = AutoProcessor.from_pretrained(name, trust_remote_code=True)
-        self.model = AutoModelForVision2Seq.from_pretrained(
-            name, trust_remote_code=True, dtype=dtype, attn_implementation=attn_implementation,
-            low_cpu_mem_usage=True).eval().to(dev)
+        self.model = _load_openvla(name, dtype, attn_implementation).eval().to(dev)
         self._dev = torch.device(dev)
         self.unnorm_key = unnorm_key
         self.action_dim = 7

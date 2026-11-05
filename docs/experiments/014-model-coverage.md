@@ -51,8 +51,12 @@ are reported as-is (no ground truth). H3: actions per second with `Stream(hop=1)
 
 ## Risks
 - OpenVLA needs `timm`, `tokenizers`, and 15 GB of weights; `flash_attn` is optional. Install into the project
-  venv on the server only. If the remote code fails on transformers 4.57, fall back to `openvla/openvla-7b` via
-  its own `predict_action` with `attn_implementation="eager"`.
+  venv on the server only. **Found:** the checkpoint's remote code is written against transformers 4.40 and
+  does not import on transformers 5.18 (`AutoModelForVision2Seq` removed, `PaddingStrategy` moved). The
+  adapter resolves the remote class from the checkpoint's `auto_map` when `AutoModelForVision2Seq` is missing,
+  but the remote code itself still breaks, so the policy runs in a second venv inside the project folder
+  (`.venv-vla`: transformers 4.40.1, tokenizers 0.19.1, timm 0.9.10, numpy<2, same torch cu128). The main
+  venv is untouched; `vam` itself has no transformers pin.
 - A policy has no accuracy metric here; the result is "it runs through the same contract and the runtime's cost
   model covers it", stated as such.
 - torchvision MViT needs 16 frames at 224²; R(2+1)D wants 112². Both are what `Preprocessor` already handles
