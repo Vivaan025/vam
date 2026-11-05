@@ -88,3 +88,21 @@ def test_cost_model_fit_ignores_one_off_stall():
     f = features_for(Config(8, True, 6), 50, [150, 150, 150, 150])
     assert abs(m.predict(f) - _true_ms(f)) < 20
     assert (m.w >= 0).all() and m.resid_p75 >= 0
+
+
+def test_budgeted_sampler_calibrates_and_plans(h264_video):
+    """016: one class takes a ms budget: calibrates on a clip, plans per video, decodes through the keyframe path."""
+    import vam
+    from vam.sampling.keyframe import OracleKeyframeScorer
+
+    path, fps, n = h264_video
+    scorer = OracleKeyframeScorer([(20.0, 30.0)], 2.0)
+    s = vam.BudgetedSampler(10_000, model=None, calibrate_on=[path], scorer=scorer, cache=False, repeats=1,
+                            window_s=2.0, decode_backend="serial")
+    assert s.cost.n_fit >= 4 and repr(s).startswith("BudgetedSampler(budget_ms=10000")
+    v = vam.load_video(path)
+    batch = s(v)
+    assert s.last_plan is not None and s.last_plan.budget_ms == 10_000
+    assert len(batch) == s.num_frames == s.last_plan.config.frames
+    assert batch.indices.max() < n
+    v.close()

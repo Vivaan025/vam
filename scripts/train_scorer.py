@@ -135,7 +135,7 @@ def main() -> None:
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", default=None)
     ap.add_argument("--release", action="store_true",
-                    help="015: after the folds, train one head on every video for the folds' mean best epoch and save it alone (folds={}) as the packaged scorer")
+                    help="015: save the fold heads as an fp16 ensemble with no fold map (the packaged scorer)")
     args = ap.parse_args()
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -195,16 +195,14 @@ def main() -> None:
 
     config = {"kind": args.kind, "context": context, "use_zeroshot": use_zs, "in_dim": in_dim, "hidden": args.hidden}
     if args.release:
-        epochs = int(round(np.mean(best_eps))) + 1
-        ax = torch.cat([xs[v] for v in vids])
-        ay = torch.cat([ys[v] for v in vids])
-        av_ = np.concatenate([[i] * len(ys[v]) for i, v in enumerate(vids)])
-        head, _ = train_fold(ax, ay, av_, ax, ay, av_, args.kind, args.hidden, device, epochs, args.lr, args.wd, args.seed)
+        # the ensemble of the fold heads is what every benchmark on held-out video ran (each head early-stopped on
+        # its own fold); a single head retrained on everything lost 4 points at 4 frames (015). Ship the ensemble
+        # in fp16 with no fold map, so every video is scored by all heads.
         out = Path(args.out or f"vam/weights/scorer_{args.kind}{'' if use_zs else '_nozs'}.pt")
         out.parent.mkdir(parents=True, exist_ok=True)
-        torch.save({"config": config, "folds": {}, "heads": [{k: v.cpu() for k, v in head.state_dict().items()}],
-                    "cv": per_fold, "trained_on": {"videos": len(vids), "epochs": epochs}}, out)
-        print(f"release head: {len(vids)} videos, {epochs} epochs -> {out} ({out.stat().st_size / 1e6:.1f} MB)")
+        torch.save({"config": config, "folds": {}, "heads": [{k: v.half() for k, v in h.items()} for h in heads],
+                    "cv": per_fold, "trained_on": {"videos": len(vids), "folds": args.folds, "best_epochs": best_eps}}, out)
+        print(f"release ensemble: {len(heads)} fold heads, fp16 -> {out} ({out.stat().st_size / 1e6:.1f} MB)")
         return
     out = Path(args.out or f"results/cache/scorer_{args.kind}{'' if use_zs else '_nozs'}.pt")
     torch.save({"config": config, "folds": folds, "heads": heads, "cv": per_fold}, out)

@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | Plan for experiment 016 (docs for v0.1, roadmap R7: quickstart, API reference, two notebooks, `BudgetedSampler` helper) | `docs/experiments/016-docs.md` | [016](experiments/016-docs.md) |
 | 2026-11-05 | Plan for experiment 015 (packaging + CI, roadmap R6: `vam-runtime` wheel, bounded ranges, packaged release scorer head, GitHub Actions on Linux + Windows) | `docs/experiments/015-packaging.md` | [015](experiments/015-packaging.md) |
 | 2026-11-05 | Results of experiment 014 (model coverage, R5 done): R(2+1)D-18 keeps the selection gain (+9 / +15.5 / +15.5), OpenVLA-7B runs through `Stream` and the cost model | `docs/results/model_coverage.md`, `README.md`, `docs/roadmap.md`, `docs/study_guide.html` | [014](experiments/014-model-coverage.md) |
 | 2026-11-05 | `Stream` raises `VideoOpenError` / `DecodeError` when a source opens but decodes nothing (an AV1 file on an OpenCV build without AV1 yielded zero frames silently); test | `vam/stream.py`, `tests/test_robustness.py` | [014](experiments/014-model-coverage.md) |
