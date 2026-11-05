@@ -68,17 +68,24 @@ class ScorerHead(nn.Module):
 DEFAULT_WEIGHTS = "scorer_context_nozs.pt"  # vam/weights/, trained by scripts/train_scorer.py --release (015)
 
 
+_DEFAULT: dict[tuple, "LearnedScorer"] = {}
+
+
 def default_scorer(device: str | None = None, clip_model: str = "openai/clip-vit-base-patch32") -> "LearnedScorer":
     """The packaged class-free scorer: CLIP ViT-B/32 embeddings + the context head trained on THUMOS14 val
-    (009/015). Needs the `hf` extra (transformers); downloads CLIP on first use."""
+    (009/015). Needs the `hf` extra (transformers); downloads CLIP on first use. One instance per (device,
+    model) is kept, so `KeyframeSampler(n)` can be constructed freely without reloading CLIP."""
     from importlib import resources
 
     from vam.sampling.keyframe import ClipScorer
 
-    path = resources.files("vam.weights") / DEFAULT_WEIGHTS
-    if not path.is_file():
-        raise FileNotFoundError(f"packaged scorer weights missing: {path}; pass a scorer to KeyframeSampler")
-    return LearnedScorer.load(str(path), ClipScorer((), model=clip_model, device=device), device)
+    key = (device, clip_model)
+    if key not in _DEFAULT:
+        path = resources.files("vam.weights") / DEFAULT_WEIGHTS
+        if not path.is_file():
+            raise FileNotFoundError(f"packaged scorer weights missing: {path}; pass a scorer to KeyframeSampler")
+        _DEFAULT[key] = LearnedScorer.load(str(path), ClipScorer((), model=clip_model, device=device), device)
+    return _DEFAULT[key]
 
 
 class LearnedScorer:
