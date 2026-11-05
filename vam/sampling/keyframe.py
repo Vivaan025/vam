@@ -38,7 +38,7 @@ Scorer = Callable[[Keyframes], np.ndarray]
 
 
 class KeyframeSampler(Sampler):
-    def __init__(self, num_frames: int, scorer: Scorer, window_s: float = 5.0,
+    def __init__(self, num_frames: int, scorer: Optional[Scorer] = None, window_s: float = 5.0,
                  segments: Optional[int] = None, thumb: tuple[int, int] = (112, 112),
                  scan_workers: int | None = None, keyframe_stride: int = 1, scan_backend: str | None = None,
                  window: str = "gap", min_window_s: float = 1.0,
@@ -47,6 +47,10 @@ class KeyframeSampler(Sampler):
                  decode_backend: str = "thread", decode_workers: int | None = None,
                  planner=None, fallback: str = "uniform", flat_eps: float = 1e-3, max_coverage: float = 0.5):
         super().__init__(num_frames)
+        if scorer is None:  # 015: the packaged class-free learned scorer (CLIP ViT-B/32 + context head)
+            from vam.sampling.learned import default_scorer
+
+            scorer = default_scorer()
         if window not in ("fixed", "gap"):
             raise ValueError(f"window must be 'fixed' or 'gap', got {window!r}")
         if alloc not in ("equal", "softmax"):
@@ -317,7 +321,7 @@ class ClipScorer:
     BACKGROUND = ["a crowd of spectators", "a scoreboard", "an empty stadium", "a television studio",
                   "a blank screen", "a logo", "people talking", "a commercial break"]
 
-    def __init__(self, class_names: list[str], model: str = "openai/clip-vit-base-patch32",
+    def __init__(self, class_names: "list[str] | tuple[str, ...]" = (), model: str = "openai/clip-vit-base-patch32",
                  device: str | None = None, template: str = "a photo of {}", use_hf_processor: bool = False,
                  half: bool = True):
         import torch
@@ -333,7 +337,7 @@ class ClipScorer:
         self.proc = CLIPProcessor.from_pretrained(model)
         self.use_hf_processor = use_hf_processor
         self.pre = Preprocessor.from_hf(self.proc.image_processor, device=self.device)
-        names = [self._human(c) for c in class_names]
+        names = [self._human(c) for c in class_names]  # empty: embeddings only (the packaged class-free scorer, 015)
         prompts = [template.format(n) for n in names] + [template.format(b) for b in self.BACKGROUND]
         self.n_cls = len(names)
         with torch.inference_mode():

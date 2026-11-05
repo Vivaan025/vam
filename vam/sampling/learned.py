@@ -65,6 +65,22 @@ class ScorerHead(nn.Module):
         return self.net(x).squeeze(-1)
 
 
+DEFAULT_WEIGHTS = "scorer_context_nozs.pt"  # vam/weights/, trained by scripts/train_scorer.py --release (015)
+
+
+def default_scorer(device: str | None = None, clip_model: str = "openai/clip-vit-base-patch32") -> "LearnedScorer":
+    """The packaged class-free scorer: CLIP ViT-B/32 embeddings + the context head trained on THUMOS14 val
+    (009/015). Needs the `hf` extra (transformers); downloads CLIP on first use."""
+    from importlib import resources
+
+    from vam.sampling.keyframe import ClipScorer
+
+    path = resources.files("vam.weights") / DEFAULT_WEIGHTS
+    if not path.is_file():
+        raise FileNotFoundError(f"packaged scorer weights missing: {path}; pass a scorer to KeyframeSampler")
+    return LearnedScorer.load(str(path), ClipScorer((), model=clip_model, device=device), device)
+
+
 class LearnedScorer:
     """scorer(kf) -> (K,) scores. `embedder` is a ClipScorer (its `embed` and, optionally, zero-shot scores)."""
 

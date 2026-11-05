@@ -3,29 +3,69 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vam"
+name = "vam-runtime"
 version = "0.1.0"
-description = "Unified library and runtime for video-action models: recognition, prediction and streaming"
+description = "Unified library and runtime for video-action models: one contract for recognition models and policies, and a latency-budgeted frame selector for long video"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
-authors = [{ name = "Vivaan" }]
+authors = [{ name = "Vivaan Lakhani" }]
+keywords = ["video", "action recognition", "frame sampling", "runtime", "vision-language-action", "pytorch"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Multimedia :: Video",
+]
 dependencies = [
-    "torch>=2.2",
-    "numpy>=1.24",
-    "opencv-python>=4.8",
-    "av>=12",
+    "torch>=2.2,<3",
+    "numpy>=1.24,<3",
+    "opencv-python>=4.8,<5",
+    "av>=12,<17",
 ]
 
 [project.optional-dependencies]
-hf = ["transformers>=4.40", "pillow"]
-dev = ["pytest>=8", "ruff"]
+# Hugging Face video classifiers and the CLIP embedder behind the packaged keyframe scorer
+hf = ["transformers>=4.40,<6", "pillow>=9"]
+# torchvision Kinetics-400 classifiers (R(2+1)D, R3D, MViT)
+torchvision = ["torchvision>=0.17,<1"]
+# OpenVLA-7B. Its remote code needs transformers 4.40.x; see docs/results/model_coverage.md
+policy = ["transformers>=4.40,<6", "pillow>=9", "timm>=0.9,<1.1", "pyarrow>=14"]
+dev = ["pytest>=8", "ruff>=0.4", "build>=1.0"]
+all = ["vam-runtime[hf,torchvision,policy]"]
+
+[project.urls]
+Homepage = "https://github.com/Vivaan025/vam"
+Repository = "https://github.com/Vivaan025/vam"
+Results = "https://github.com/Vivaan025/vam/tree/main/docs/results"
+Changelog = "https://github.com/Vivaan025/vam/blob/main/docs/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 include = ["vam*"]
 
+[tool.setuptools.package-data]
+"vam.weights" = ["*.pt"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: downloads model weights or runs a full model; deselected in CI with -m 'not slow'",
+]
 
 [tool.ruff]
-line-length = 100
+line-length = 130
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["vam"]

@@ -1,6 +1,5 @@
 """Experiment 014: a second recognition family and policies through the same contract."""
 
-import numpy as np
 import pytest
 import torch
 

@@ -134,6 +134,8 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--release", action="store_true",
+                    help="015: after the folds, train one head on every video for the folds' mean best epoch and save it alone (folds={}) as the packaged scorer")
     args = ap.parse_args()
     device = args.device or ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -169,18 +171,21 @@ def main() -> None:
     orc = np.mean([np.sort(ys[v].numpy())[::-1][:2].mean() for v in vids])
     print(f"oracle           chosen_overlap={orc:.3f}  (ceiling of the top-2 windows)")
 
-    heads, per_fold = [], []
+    heads, per_fold, best_eps = [], [], []
     for k in range(args.folds):
         tr = [v for v in vids if folds[v] != k]
         va = [v for v in vids if folds[v] == k]
-        tx = torch.cat([xs[v] for v in tr]); ty = torch.cat([ys[v] for v in tr])
+        tx = torch.cat([xs[v] for v in tr])
+        ty = torch.cat([ys[v] for v in tr])
         tv = np.concatenate([[i] * len(ys[v]) for i, v in enumerate(tr)])
-        vx = torch.cat([xs[v] for v in va]); vy = torch.cat([ys[v] for v in va])
+        vx = torch.cat([xs[v] for v in va])
+        vy = torch.cat([ys[v] for v in va])
         vv = np.concatenate([[v] * len(ys[v]) for v in va])
         head, ep = train_fold(tx, ty, tv, vx, vy, vv, args.kind, args.hidden, device, args.epochs, args.lr, args.wd,
                               args.seed + k)
         m = evaluate(head, vx, vy, vv, device)
         per_fold.append(m)
+        best_eps.append(ep)
         heads.append({kk: v.cpu() for kk, v in head.state_dict().items()})
         print(f"fold {k}: best epoch {ep:3d}  spearman={m['spearman']:.3f}  top2_prec={m['top2_prec']:.3f}  "
               f"top4_prec={m['top4_prec']:.3f}  chosen_overlap={m['chosen_overlap']:.3f}", flush=True)
@@ -188,9 +193,21 @@ def main() -> None:
     std = {k: float(np.std([m[k] for m in per_fold])) for k in per_fold[0]}
     print(f"{args.kind:8s} zs={use_zs} ctx={context}  " + "  ".join(f"{k}={mean[k]:.3f}±{std[k]:.3f}" for k in mean))
 
+    config = {"kind": args.kind, "context": context, "use_zeroshot": use_zs, "in_dim": in_dim, "hidden": args.hidden}
+    if args.release:
+        epochs = int(round(np.mean(best_eps))) + 1
+        ax = torch.cat([xs[v] for v in vids])
+        ay = torch.cat([ys[v] for v in vids])
+        av_ = np.concatenate([[i] * len(ys[v]) for i, v in enumerate(vids)])
+        head, _ = train_fold(ax, ay, av_, ax, ay, av_, args.kind, args.hidden, device, epochs, args.lr, args.wd, args.seed)
+        out = Path(args.out or f"vam/weights/scorer_{args.kind}{'' if use_zs else '_nozs'}.pt")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        torch.save({"config": config, "folds": {}, "heads": [{k: v.cpu() for k, v in head.state_dict().items()}],
+                    "cv": per_fold, "trained_on": {"videos": len(vids), "epochs": epochs}}, out)
+        print(f"release head: {len(vids)} videos, {epochs} epochs -> {out} ({out.stat().st_size / 1e6:.1f} MB)")
+        return
     out = Path(args.out or f"results/cache/scorer_{args.kind}{'' if use_zs else '_nozs'}.pt")
-    torch.save({"config": {"kind": args.kind, "context": context, "use_zeroshot": use_zs, "in_dim": in_dim,
-                           "hidden": args.hidden}, "folds": folds, "heads": heads, "cv": per_fold}, out)
+    torch.save({"config": config, "folds": folds, "heads": heads, "cv": per_fold}, out)
     print("wrote", out)
 
 

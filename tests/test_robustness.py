@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 
 import vam
-from vam.errors import DecodeError, ScanError, VamError, VideoOpenError
+from vam.errors import DecodeError, VamError, VideoOpenError
 from vam.runtime.scan import scan_keyframes, shutdown_pools
-from vam.runtime.scheduler import ACCURACY, Config, CostModel, Features, Scheduler, features_for
+from vam.runtime.scheduler import ACCURACY, Config, CostModel, Scheduler, features_for
 from vam.sampling import UniformSampler
 from vam.sampling.keyframe import KeyframeSampler, OracleKeyframeScorer
 

@@ -31,8 +31,7 @@ import torch
 import vam
 from vam.data import THUMOS14, UCF101, Charades, UntrimmedVideo
 from vam.models.probe import HFFeatureExtractor, LinearProbe
-from vam.sampling import (ClipScorer, KeyframeSampler, LearnedScorer, MotionSampler, OracleKeyframeScorer, Sampler,
-                          UniformSampler)
+from vam.sampling import ClipScorer, KeyframeSampler, LearnedScorer, MotionSampler, OracleKeyframeScorer, Sampler, UniformSampler
 
 BACKBONES = {
     "videomae-base-kinetics": "MCG-NJU/videomae-base-finetuned-kinetics",

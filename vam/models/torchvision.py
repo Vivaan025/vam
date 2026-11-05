@@ -89,7 +89,7 @@ class TorchvisionVideoClassifier(VideoActionModel):
     @property
     def feature_dim(self) -> int:
         m = self.model
-        lin = m.fc if hasattr(m, "fc") else [l for l in m.head.modules() if isinstance(l, torch.nn.Linear)][-1]
+        lin = m.fc if hasattr(m, "fc") else [m_ for m_ in m.head.modules() if isinstance(m_, torch.nn.Linear)][-1]
         return int(lin.in_features)
 
 

@@ -69,3 +69,31 @@ def test_gap_window_targets_and_features():
     kf = Keyframes(times, np.arange(5), np.zeros((5, 8, 8, 3), np.uint8), 1.0, 20.0, 20)
     assert sc(kf).shape == (5,)
     assert len(sc.for_video("v1")._heads()) == 1 and len(sc.for_video("new")._heads()) == 2
+
+
+def test_packaged_scorer_weights_load_without_clip():
+    """015: the release head ships in the wheel; load it with a fake 512-d embedder (no CLIP download)."""
+    from importlib import resources
+
+    import numpy as np
+    import torch
+
+    from vam.runtime.scan import Keyframes
+    from vam.sampling.learned import DEFAULT_WEIGHTS, LearnedScorer
+
+    path = resources.files("vam.weights") / DEFAULT_WEIGHTS
+    assert path.is_file() and path.stat().st_size < 5_000_000
+
+    class FakeEmbedder:
+        device = "cpu"
+
+        def embed(self, thumbs):
+            g = torch.Generator().manual_seed(0)
+            return torch.randn(len(thumbs), 512, generator=g)
+
+    sc = LearnedScorer.load(str(path), FakeEmbedder(), device="cpu")
+    assert sc.folds == {} and len(sc.heads) == 1 and not sc.use_zs
+    times = np.arange(0, 40, 2.0)
+    kf = Keyframes(times, np.arange(len(times)) * 20, np.zeros((len(times), 8, 8, 3), np.uint8), 10.0, 40.0, 400)
+    out = sc(kf)
+    assert out.shape == (len(times),) and np.isfinite(out).all()

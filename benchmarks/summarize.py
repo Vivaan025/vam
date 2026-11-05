@@ -25,7 +25,8 @@ def main() -> None:
     rows = []
     for (gpu, backbone, sampler, budget), rs in sorted(groups.items(), key=lambda kv: (kv[0][0], kv[0][1], kv[0][3], kv[0][2])):
         n = len(rs)
-        mean = lambda k: sum(r[k] for r in rs) / n
+        def mean(k):
+            return sum(r[k] for r in rs) / n
         rows.append({
             "gpu": gpu, "backbone": backbone, "sampler": sampler, "budget": budget, "n": n,
             "top1": sum(r["correct"] for r in rs) / n,

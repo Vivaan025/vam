@@ -22,7 +22,7 @@ import torch
 import vam
 from vam.data import THUMOS14, UCF101, Charades
 from vam.models.probe import HFFeatureExtractor, LinearProbe
-from vam.runtime.scheduler import Config, Features, Scheduler, calibrate, features_for
+from vam.runtime.scheduler import Config, Scheduler, calibrate, features_for
 from vam.sampling import ClipScorer, KeyframeSampler, LearnedScorer
 
 BACKBONES = {

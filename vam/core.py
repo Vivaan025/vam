@@ -15,10 +15,10 @@ from dataclasses import dataclass, field
 from typing import Iterator, Optional, Sequence
 
 import cv2
-
-from vam.errors import DecodeError, VideoOpenError
 import numpy as np
 import torch
+
+from vam.errors import DecodeError, VideoOpenError
 
 
 @dataclass
