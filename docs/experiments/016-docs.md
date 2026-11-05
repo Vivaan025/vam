@@ -1,6 +1,6 @@
 # 016 · Docs for v0.1: quickstart, API reference, two notebooks (roadmap R7)
 
-**Date:** 2026-11-05 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-05 · **Status:** done · **Results:** below
 
 ## Motivation
 After 015 a stranger can `pip install` the wheel. They still have to read `docs/experiments/` to find out
@@ -45,7 +45,30 @@ notebooks.
   Creative-Commons sports clip or synthesises a 3-minute clip with `examples/make_sample.py --seconds 180`.
 
 ## Results
-*(to fill)*
+- **H1.** `docs/quickstart.md`: install, synthetic clip, classifier, `UniformSampler` → `KeyframeSampler(8)`,
+  `BudgetedSampler(150, ...)`, `Stream`, a policy, the errors. `tests/test_docs.py` runs the snippets that need
+  no weights (fake policy, stream, profiler, errors, and the budget example with the oracle scorer) as written;
+  the CI wheel job runs the VideoMAE ones through `examples/quickstart.py`.
+- **H2.** `vam.BudgetedSampler(budget_ms, model, calibrate_on=[...])` is one line in the quickstart; it wraps
+  `calibrate` + `Scheduler` + `KeyframeSampler(planner=...)` with no new behaviour. Writing it exposed that
+  `KeyframeSampler(n)` reloaded CLIP on every construction; `default_scorer` now caches one instance per
+  (device, model).
+- **H3.** `docs/api.md` lists every public name with signature, purpose and originating experiment; the test
+  asserts each module's `__all__` is covered (`vam`, `vam.sampling`, `vam.runtime`, `vam.models`, `vam.data`,
+  `vam.errors`).
+- **H4.** Both notebooks executed top to bottom on the server with `nbconvert` (RTX 5090, THUMOS14 val clips),
+  outputs committed. `01_frame_selection`: on a 170 s clip, 24 keyframes scanned, 4 windows; uniform-4 120 ms,
+  uniform-16 639 ms, keyframe-4 and keyframe-16 both 143 ms (the 007 result on one video). `02_latency_budget`:
+  calibration 6.1 s on 24 timings (intercept 63 ms, 0.42 ms per window frame, 0.17 per candidate, 0.11 per
+  model frame, 19 ms margin); over 17 clips the sampler chose 4 frames at 100 ms (p50 101 ms, within 0.41),
+  16 frames at 150 ms (p50 110, within 0.76) and 16 frames with stride-3 refinement from 200 ms (p50 133,
+  within 0.88; 1.00 at 300 ms): the 010 staircase reproduced from one class. An earlier run of the same notebook
+  on the same machine chose 4 frames at 150 ms because its calibration fitted a higher per-model-frame cost; the
+  choice at the 150 ms knee is sensitive to a 6 s calibration, which is 010's "within budget" caveat restated.
+- Jupyter's runtime, config and matplotlib caches were pointed inside the project folder for the run; the
+  scan pool's exit hook now waits for its workers, which removed eight worker tracebacks at kernel exit.
 
 ## Decision
-*(to fill)*
+R7 done; v0.1.0 is complete on the roadmap's terms pending a green CI run on the first push. Tag `v0.1.0`
+after that run. Post-v0.1 research: the trained action-coverage estimator for the scheduler (012/013), and
+per-backbone accuracy tables for the scheduler (014).

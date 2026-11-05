@@ -12,7 +12,7 @@ entry when it lands.
 | R4 ✔ | Robustness (013, done 2026-11-05): `vam.errors`, forkserver pool + scan timeout, degenerate inputs → uniform, scheduler uniform fallback | a library fails in the field on inputs the benchmark never sees | 3 days | 2026-11-19 |
 | R5 ✔ | Model coverage (014, done 2026-11-05): torchvision R(2+1)D-18 / R3D-18 / MViT-v2-S, `ActionPolicy` + OpenVLA-7B; selection gain holds on the second family, policy runs through `Stream` and the cost model | the unified-API claim needs both uses proven | 1 week | 2026-11-26 |
 | R6 ✔ | Packaging (015, done 2026-11-05): `vam-runtime` wheel with the packaged scorer, bounded ranges, GitHub Actions on Linux + Windows | installability | 2 days | 2026-11-28 |
-| R7 | Docs: quickstart, API reference, two example notebooks | adoption | 2–3 days | 2026-12-01 |
+| R7 ✔ | Docs (016, done 2026-11-06): quickstart, API reference, two executed notebooks, `BudgetedSampler` | adoption | 2–3 days | 2026-12-01 |
 
 Deferred past v0.1: NVDEC / torchcodec decode (008). The decode stage is a ~90 ms seek-bound floor that is
 already below uniform sampling's latency; hardware decode would add an install burden that costs users more
