@@ -64,12 +64,13 @@ class FakePolicy(ActionPolicy):
 def _load_openvla(name: str, dtype: torch.dtype, attn_implementation: str):
     """transformers < 5 exposes `AutoModelForVision2Seq`, which the checkpoint's `auto_map` targets; transformers 5
     removed it, so resolve the remote class from the checkpoint's `auto_map` directly."""
-    kw = dict(trust_remote_code=True, dtype=dtype, attn_implementation=attn_implementation, low_cpu_mem_usage=True)
+    kw = dict(trust_remote_code=True, attn_implementation=attn_implementation, low_cpu_mem_usage=True)
     try:
         from transformers import AutoModelForVision2Seq
 
-        return AutoModelForVision2Seq.from_pretrained(name, **kw)
+        return AutoModelForVision2Seq.from_pretrained(name, torch_dtype=dtype, **kw)  # 4.x spelling
     except ImportError:
+        kw["dtype"] = dtype
         from transformers import AutoConfig
         from transformers.dynamic_module_utils import get_class_from_dynamic_module
 
