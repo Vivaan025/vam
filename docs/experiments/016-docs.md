@@ -69,6 +69,5 @@ notebooks.
   scan pool's exit hook now waits for its workers, which removed eight worker tracebacks at kernel exit.
 
 ## Decision
-R7 done; v0.1.0 is complete on the roadmap's terms pending a green CI run on the first push. Tag `v0.1.0`
-after that run. Post-v0.1 research: the trained action-coverage estimator for the scheduler (012/013), and
+R7 done; CI green on the first push (run 42097227912), tagged `v0.1.0` on 3ccd9be. Post-v0.1 research: the trained action-coverage estimator for the scheduler (012/013), and
 per-backbone accuracy tables for the scheduler (014).

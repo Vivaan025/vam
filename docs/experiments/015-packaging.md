@@ -61,7 +61,7 @@ head within 1 point of the fold ensemble at 4 / 8 / 16 frames. H3: two green CI 
   5-fold metrics of the heads: Spearman 0.321 ± 0.043, top-2 precision 0.732 ± 0.023, chosen overlap
   0.546 ± 0.048. `KeyframeSampler(8)` with no scorer argument loads it; `ClipScorer` with no class names is the
   embedder.
-- **H3: written, not yet observed.** `.github/workflows/ci.yml` runs ruff + the suite on ubuntu / windows ×
+- **H3 holds (observed 2026-11-06).** Run [42097227912](https://github.com/Vivaan025/vam/actions/runs/42097227912) on 3ccd9be: all six jobs green (tests on ubuntu + windows × 3.11 / 3.12; wheel + quickstart on both OSes). `.github/workflows/ci.yml` runs ruff + the suite on ubuntu / windows ×
   3.11 / 3.12, builds the wheel and runs the quickstart from a clean venv on both OSes. The suite passes locally
   on Windows (77 passed, 3 skipped, 41 s; the torchvision download test deselected) and on the server (70 before the docs tests); the first Actions run
   happens on the next push and its result goes in the changelog.
@@ -70,5 +70,5 @@ head within 1 point of the fold ensemble at 4 / 8 / 16 frames. H3: two green CI 
   name stays `vam`. ruff is clean on `vam`, `tests`, `benchmarks`, `scripts`, `examples`.
 
 ## Decision
-R6 done except for seeing CI green, which needs a push. Ship the ensemble, not a retrained head. The 13 → 6.6 MB
+R6 done; CI green on the first run. Ship the ensemble, not a retrained head. The 13 → 6.6 MB
 fp16 cast changes no held-out number. Next 016 (docs).
