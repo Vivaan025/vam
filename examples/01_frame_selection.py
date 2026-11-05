@@ -113,3 +113,4 @@ for name, ms in rows:
 
 # %%
 video.close()
+vam.runtime.shutdown_pools()  # stop the keyframe-scan workers (also happens at exit)

@@ -106,8 +106,12 @@ plt.show()
 # %%
 frames = {b: [int(r["config"].split("f")[0].replace("uniform-", "")) for r in rows if r["budget"] == b] for b in budgets}
 fig, ax = plt.subplots(figsize=(5.5, 3))
-ax.boxplot([frames[b] for b in budgets], labels=[str(b) for b in budgets])
+ax.boxplot([frames[b] for b in budgets])
+ax.set_xticks(range(1, len(budgets) + 1), [str(b) for b in budgets])
 ax.set_xlabel("budget (ms)")
 ax.set_ylabel("frames chosen")
 plt.tight_layout()
 plt.show()
+
+# %%
+vam.runtime.shutdown_pools()

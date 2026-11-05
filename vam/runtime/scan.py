@@ -95,7 +95,9 @@ def _process_pool(workers: int):
         ctx = mp.get_context("forkserver" if "forkserver" in methods else "spawn")
         _POOL = ProcessPoolExecutor(workers, mp_context=ctx)
         _POOL_SIZE = workers
-        atexit.register(_POOL.shutdown, wait=False)
+        # wait=True: with wait=False the idle workers are torn down mid-`call_queue.get` and each prints a
+        # traceback at interpreter exit (seen under nbconvert in 016)
+        atexit.register(shutdown_pools, wait=True)
     return _POOL
 
 
