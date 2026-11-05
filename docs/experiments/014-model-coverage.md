@@ -1,6 +1,6 @@
 # 014 · Model coverage: a second recognition family and a policy / VLA adapter
 
-**Date:** 2026-11-05 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-05 · **Status:** done · **Results:** [`docs/results/model_coverage.md`](../results/model_coverage.md)
 
 ## Motivation (roadmap R5)
 The README claims one output type serves both meanings of "action model": recognition fills `logits`, agent
@@ -63,7 +63,23 @@ are reported as-is (no ground truth). H3: actions per second with `Stream(hop=1)
   with explicit parameters.
 
 ## Results
-*(to fill)*
+Full write-up in [`docs/results/model_coverage.md`](../results/model_coverage.md).
+
+- **H1 holds.** R(2+1)D-18 + UCF101 probe on THUMOS14 val: kf-learned + refine 0.655 / 0.675 / 0.700 at 4 / 8 / 16
+  frames in 140 / 150 / 147 ms, uniform 0.565 / 0.520 / 0.545 in 135 / 271 / 498 ms (+9.0 / +15.5 / +15.5; the plan
+  asked for ≥ +5 at 4 frames). The scheduler on the new backbone: 0.645 / 0.690 / 0.700 at 100 / 150 / 200 ms,
+  within 1 point of the best static configuration at each budget, from a 4.9 s calibration.
+- **H2 holds.** OpenVLA-7B runs through `Stream(window=1, hop=1)` as an `ActionPolicy` at 113 ms / step (p90 212),
+  14.8 GB peak. On Bridge episode 0 the predicted translation deltas correlate 0.97 / 0.97 / 0.96 with the recorded
+  ones, gripper agreement 0.85, 3 predicted flips vs 2 true; episode 1: 0.90 / 0.88 / 0.71, gripper 0.78. On the
+  Charades control clip the gripper flips 21 times in 60 steps (wrong domain, as expected).
+- **H3 holds.** `calibrate` with the policy as the model fits 11 ms + 114 ms per frame, residual 0.
+- Found and fixed: OpenVLA's remote code needs transformers 4.40 (second venv `.venv-vla` inside the project;
+  the adapter also loads on transformers 5 via `auto_map`); `predict_action` leaves `attention_mask` one token
+  short (adapter drops the mask); the LeRobot export is AV1, which pip OpenCV cannot decode, and `Stream`
+  yielded nothing silently; it now raises `VideoOpenError` / `DecodeError`.
 
 ## Decision
-*(to fill)*
+R5 done: six models (VideoMAE, R(2+1)D-18, R3D-18, MViT-v2-S, OpenVLA-7B, FakePolicy) through one contract; the
+selection gain survives a change of backbone family and a policy needs no special path. MViT-v2-S and R3D-18 are
+registered and shape-tested, not benchmarked. Next R6 (packaging + CI), R7 (docs).

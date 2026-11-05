@@ -66,10 +66,17 @@ better than uniform sampling and neither is `vam` (`docs/results/charades.md`). 
 are a small fraction of the video. Since 013 the scheduler falls back to uniform frames when its scan carries no
 information (one keyframe, flat scores, windows that would cover most of the clip).
 
+**The same runtime serves other models.** With torchvision's R(2+1)D-18 in place of VideoMAE the selection gain is
+the same size (0.655 / 0.675 / 0.700 vs uniform 0.565 / 0.520 / 0.545 at 4 / 8 / 16 frames, ~145 ms vs 135–498 ms),
+and OpenVLA-7B, a robot policy, runs through `Stream` as an `ActionPolicy` at 113 ms a step with its actions tracking
+the recorded ones on BridgeData (Δxyz correlation 0.97) and the scheduler's cost model fitting it unchanged
+(`docs/results/model_coverage.md`).
+
 
 - [x] `Video` with lazy decoding, `FrameBatch`, `ActionOutput`
 - [x] `UniformSampler`, `MotionSampler`
 - [x] Hugging Face adapter (VideoMAE, TimeSformer, any `AutoModelForVideoClassification`)
+- [x] torchvision adapter (R(2+1)D-18, R3D-18, MViT-v2-S) and `ActionPolicy` + OpenVLA-7B (`docs/results/model_coverage.md`)
 - [x] `Profiler` (wall time + peak GPU memory per stage), `FeatureCache` (LRU, memory budget)
 - [x] `Stream` with overlapping windows
 - [x] Benchmark harness writing JSONL with GPU name, for cross-machine comparison
@@ -87,11 +94,10 @@ information (one keyframe, flat scores, windows that would cover most of the cli
 - [x] Generality within domain: held-out split, 1080p, HEVC, VP9, keyframe density (`docs/results/thumos14_generality.md`)
 - [x] Second domain: Charades, a negative result that states the method's boundary (`docs/results/charades.md`)
 - [x] Robustness: documented errors, no hangs, degenerate inputs answer uniform, scheduler fallback (`docs/results/robustness.md`)
-- [ ] Model coverage (policy / VLA adapter); packaging + CI; docs (see `docs/roadmap.md`)
+- [ ] Packaging + CI; docs (see `docs/roadmap.md`)
 - [ ] GPU windowed decode (NVDEC) — deferred past v0.1
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline
-- [ ] Policy / VLA adapter (video-to-action)
 - [ ] Custom kernels where profiling justifies them
 
 ## Research question

@@ -1,0 +1,14 @@
+part,model,sampler_or_clip,budget,n,top1,ms_p50,ms_p90,note
+thumos14,r2plus1d-18-k400,uniform,4,200,0.565,135,,decode 120 infer 14
+thumos14,r2plus1d-18-k400,kf-learned+refine,4,200,0.655,140,,select 137 infer 3
+thumos14,r2plus1d-18-k400,uniform,8,200,0.520,271,,decode 256
+thumos14,r2plus1d-18-k400,kf-learned+refine,8,200,0.675,150,,select 139
+thumos14,r2plus1d-18-k400,uniform,16,200,0.545,498,,decode 494
+thumos14,r2plus1d-18-k400,kf-learned+refine,16,200,0.700,147,,select 139
+scheduler,r2plus1d-18-k400,budget_ms,100,200,0.645,123,178,within 0.26; 4f x197 uniform x2
+scheduler,r2plus1d-18-k400,budget_ms,150,200,0.690,136,194,within 0.60; 16f x160 16f+refine x26 uniform x14
+scheduler,r2plus1d-18-k400,budget_ms,200,200,0.700,156,213,within 0.83; 16f+refine/3 x186 uniform x14
+policy,openvla-7b,bridge_episode_000000,1,26,,113,212,corr xyz 0.97/0.97/0.96 sign 0.97 gripper 0.85 flips 3/2
+policy,openvla-7b,bridge_episode_000001,1,45,,115,213,corr xyz 0.90/0.88/0.71 sign 0.74 gripper 0.78 flips 10/6
+policy,openvla-7b,charades_001YG,1,60,,114,211,control; gripper flips 21
+policy,openvla-7b,cost_model,,6,,,,11 ms + 114 ms per frame p75 resid 0

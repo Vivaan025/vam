@@ -4,6 +4,9 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | Results of experiment 014 (model coverage, R5 done): R(2+1)D-18 keeps the selection gain (+9 / +15.5 / +15.5), OpenVLA-7B runs through `Stream` and the cost model | `docs/results/model_coverage.md`, `README.md`, `docs/roadmap.md`, `docs/study_guide.html` | [014](experiments/014-model-coverage.md) |
+| 2026-11-05 | `Stream` raises `VideoOpenError` / `DecodeError` when a source opens but decodes nothing (an AV1 file on an OpenCV build without AV1 yielded zero frames silently); test | `vam/stream.py`, `tests/test_robustness.py` | [014](experiments/014-model-coverage.md) |
+| 2026-11-05 | OpenVLA adapter: loads on transformers 4.x (`AutoModelForVision2Seq`, `torch_dtype`) and 5.x (class resolved from the checkpoint's `auto_map`, `dtype`); drops `attention_mask`, which `predict_action` leaves one token short | `vam/models/policy.py` | [014](experiments/014-model-coverage.md) |
 | 2026-11-05 | `benchmarks/eval_policy.py`: a policy over `Stream`, per-step latency, agreement with LeRobot-recorded actions, cost-model calibration with the policy as the model | `benchmarks/eval_policy.py` | [014](experiments/014-model-coverage.md) |
 | 2026-11-05 | `vam.models.torchvision` (R(2+1)D-18, R3D-18, MViT-v2-S, Kinetics-400, with `features()` for the probe), `vam.models.policy` (`ActionPolicy`, `FakePolicy`, `OpenVLAPolicy`), registry entries, `make_extractor` in the benchmarks; `Stream` honours `hop > window`; tests | `vam/models/`, `vam/stream.py`, `benchmarks/`, `tests/test_models.py` | [014](experiments/014-model-coverage.md) |
 | 2026-11-05 | Plan for experiment 014 (model coverage, roadmap R5: torchvision video classifiers, `ActionPolicy` + OpenVLA-7B adapter, policy benchmark) | `docs/experiments/014-model-coverage.md` | [014](experiments/014-model-coverage.md) |
