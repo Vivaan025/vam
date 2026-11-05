@@ -17,6 +17,11 @@ def _load_adapters() -> None:
         import vam.models.hf  # noqa: F401  (registers HF models; needs transformers)
     except ImportError:
         pass
+    try:
+        import vam.models.torchvision  # noqa: F401  (014: torchvision video classifiers)
+    except ImportError:
+        pass
+    import vam.models.policy  # noqa: F401  (014: FakePolicy always; OpenVLA needs transformers at call time)
 
 
 def list_models() -> list[str]:

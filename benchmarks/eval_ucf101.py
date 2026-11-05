@@ -29,6 +29,16 @@ BACKBONES = {
     "videomae-small-kinetics": "MCG-NJU/videomae-small-finetuned-kinetics",
     "timesformer-base-k400": "facebook/timesformer-base-finetuned-k400",
 }
+TV_BACKBONES = {"r2plus1d-18-k400": "r2plus1d_18", "r3d-18-k400": "r3d_18", "mvit-v2-s-k400": "mvit_v2_s"}
+
+
+def make_extractor(backbone: str, device: str | None = None):
+    """Feature extractor for a backbone name: HF video classifiers or torchvision ones (014)."""
+    if backbone in TV_BACKBONES:
+        from vam.models.torchvision import TorchvisionVideoClassifier
+
+        return TorchvisionVideoClassifier(TV_BACKBONES[backbone], device=device)
+    return HFFeatureExtractor(BACKBONES[backbone], device=device)
 
 
 def extract_train_features(extractor, ds, cache: Path):
@@ -58,7 +68,7 @@ def extract_train_features(extractor, ds, cache: Path):
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="data/ucf101")
-    ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES))
+    ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES) + sorted(TV_BACKBONES))
     ap.add_argument("--fold", type=int, default=1)
     ap.add_argument("--train-limit", type=int, default=None)
     ap.add_argument("--test-limit", type=int, default=None)
@@ -73,7 +83,7 @@ def main() -> None:
     test = UCF101(args.root, "test", args.fold, limit=args.test_limit)
     print(gpu, "|", args.backbone, "|", train, "|", test)
 
-    extractor = HFFeatureExtractor(BACKBONES[args.backbone])
+    extractor = make_extractor(args.backbone)
     probe = LinearProbe(extractor, train.num_classes, train.classes)
 
     cache_dir = Path(args.cache_dir)

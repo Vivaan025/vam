@@ -35,8 +35,15 @@ class Stream:
         buf: list[np.ndarray] = []
         idxs: list[int] = []
         i = 0
+        skip = 0  # frames to drop after a window when hop > window (014: a policy acting every k-th frame)
         try:
             while True:
+                if skip > 0:
+                    if not cap.grab():
+                        break
+                    i += 1
+                    skip -= 1
+                    continue
                 ok, bgr = cap.read()
                 if not ok:
                     break
@@ -46,6 +53,7 @@ class Stream:
                 if len(buf) == self.window:
                     yield self._batch(buf, idxs, fps)
                     buf, idxs = buf[self.hop:], idxs[self.hop:]
+                    skip = max(0, self.hop - self.window)
             if buf:
                 yield self._batch(buf, idxs, fps)
         finally:

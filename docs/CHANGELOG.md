@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | `vam.models.torchvision` (R(2+1)D-18, R3D-18, MViT-v2-S, Kinetics-400, with `features()` for the probe), `vam.models.policy` (`ActionPolicy`, `FakePolicy`, `OpenVLAPolicy`), registry entries, `make_extractor` in the benchmarks; `Stream` honours `hop > window`; tests | `vam/models/`, `vam/stream.py`, `benchmarks/`, `tests/test_models.py` | [014](experiments/014-model-coverage.md) |
 | 2026-11-05 | Plan for experiment 014 (model coverage, roadmap R5: torchvision video classifiers, `ActionPolicy` + OpenVLA-7B adapter, policy benchmark) | `docs/experiments/014-model-coverage.md` | [014](experiments/014-model-coverage.md) |
 | 2026-11-05 | Results of experiment 013 (robustness, R4 done): errors, deadlock fix, uniform fallback measured on Charades and THUMOS14 | `docs/results/robustness.md`, `README.md`, `docs/roadmap.md` | [013](experiments/013-robustness.md) |
 | 2026-11-05 | Window-coverage fallback: `KeyframeSampler(max_coverage=0.5)` and `Scheduler.planner(max_coverage=0.5)` answer uniform when the chosen windows would cover more than half the video (the flat-score rule alone fired on 71 of 1,000 Charades clips) | `vam/sampling/keyframe.py`, `vam/runtime/scheduler.py`, `tests/test_robustness.py` | [013](experiments/013-robustness.md) |

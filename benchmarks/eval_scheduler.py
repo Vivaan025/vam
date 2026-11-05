@@ -29,6 +29,16 @@ BACKBONES = {
     "videomae-base-kinetics": "MCG-NJU/videomae-base-finetuned-kinetics",
     "videomae-small-kinetics": "MCG-NJU/videomae-small-finetuned-kinetics",
 }
+TV_BACKBONES = {"r2plus1d-18-k400": "r2plus1d_18", "r3d-18-k400": "r3d_18", "mvit-v2-s-k400": "mvit_v2_s"}
+
+
+def make_extractor(backbone: str, device: str | None = None):
+    """Feature extractor for a backbone name: HF video classifiers or torchvision ones (014)."""
+    if backbone in TV_BACKBONES:
+        from vam.models.torchvision import TorchvisionVideoClassifier
+
+        return TorchvisionVideoClassifier(TV_BACKBONES[backbone], device=device)
+    return HFFeatureExtractor(BACKBONES[backbone], device=device)
 
 
 def main() -> None:
@@ -37,7 +47,7 @@ def main() -> None:
     ap.add_argument("--root", default="data/thumos14")
     ap.add_argument("--split", default="val", choices=["val", "test", "train"], help="THUMOS14: val | test (011, held out); Charades: train | test")
     ap.add_argument("--ucf-root", default="data/ucf101")
-    ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES))
+    ap.add_argument("--backbone", default="videomae-base-kinetics", choices=sorted(BACKBONES) + sorted(TV_BACKBONES))
     ap.add_argument("--head", required=True)
     ap.add_argument("--scorer-head", required=True)
     ap.add_argument("--budgets", type=float, nargs="+", default=[100, 125, 150, 200, 300])
@@ -67,7 +77,7 @@ def main() -> None:
 
     clip = ClipScorer(ds.classes, device=device)
     learned = LearnedScorer.load(args.scorer_head, clip)
-    extractor = HFFeatureExtractor(BACKBONES[args.backbone], device=device)
+    extractor = make_extractor(args.backbone, device=device)
     probe = LinearProbe(extractor, len(head_classes), head_classes).load_head(args.head)
 
     def make_sampler(cfg: Config, video_id: str, planner=None) -> KeyframeSampler:

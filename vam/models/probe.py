@@ -36,7 +36,7 @@ class LinearProbe(VideoActionModel):
         super().__init__()
         self.extractor = extractor
         self.default_num_frames = extractor.default_num_frames
-        dim = extractor.model.config.hidden_size
+        dim = getattr(extractor, "feature_dim", None) or extractor.model.config.hidden_size
         self.head = torch.nn.Linear(dim, num_classes).to(extractor._dev)
         self.labels = class_names
 
