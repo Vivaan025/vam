@@ -1,6 +1,6 @@
 # 015 · Packaging and CI (roadmap R6)
 
-**Date:** 2026-11-05 · **Status:** planned · **Results:** *(to fill)*
+**Date:** 2026-11-05 · **Status:** done · **Results:** below
 
 ## Motivation
 Experiments 001–014 make the runtime research-ready. A stranger still cannot `pip install` it: there is no wheel,
@@ -48,7 +48,27 @@ head within 1 point of the fold ensemble at 4 / 8 / 16 frames. H3: two green CI 
 - Windows: the process scan backend is skipped (no fork); the thread backend is what the tests cover there.
 
 ## Results
-*(to fill)*
+- **H1 holds.** `vam_runtime-0.1.0-py3-none-any.whl` (6.1 MB compressed; the scorer is 6.6 MB of the 6.7 MB unpacked) installs with CPU
+  torch into a fresh venv on Windows 11 (local) and Ubuntu (the server), with no repository on `sys.path`;
+  `examples/make_sample.py` then `examples/quickstart.py` run end to end and the two machines print identical
+  predictions (VideoMAE top-3 on the synthetic clip: `answering questions 0.0290, juggling balls 0.0240,
+  beatboxing 0.0235`). 349 ms per 16-frame call on the server's CPU, 2.5 s on the laptop.
+- **H2 holds, after one correction.** A single head retrained on all 200 videos for the folds' mean best epoch
+  (2.6 MB) reached 0.825 / 0.892 / 0.934 on the 212 held-out test videos against the fold ensemble's
+  0.863 / 0.901 / 0.915: 4 points down at 4 frames, where it matters most. The packaged scorer is therefore the
+  five fold heads themselves as an fp16 ensemble (6.6 MB, `folds = {}` so every video is scored by all five):
+  it reproduces the held-out numbers exactly, **0.863 / 0.901 / 0.915** at 147 / 163 / 159 ms. The scorer-level
+  5-fold metrics of the heads: Spearman 0.321 ± 0.043, top-2 precision 0.732 ± 0.023, chosen overlap
+  0.546 ± 0.048. `KeyframeSampler(8)` with no scorer argument loads it; `ClipScorer` with no class names is the
+  embedder.
+- **H3: written, not yet observed.** `.github/workflows/ci.yml` runs ruff + the suite on ubuntu / windows ×
+  3.11 / 3.12, builds the wheel and runs the quickstart from a clean venv on both OSes. The suite passes locally
+  on Windows (77 passed, 3 skipped, 41 s; the torchvision download test deselected) and on the server (70 before the docs tests); the first Actions run
+  happens on the next push and its result goes in the changelog.
+- Dependencies are bounded (`torch<3`, `numpy<3`, `opencv-python<5`, `av<17`, `transformers<6`); extras `hf`,
+  `torchvision`, `policy`, `dev`, `all`. `vam` is taken on PyPI, so the distribution is `vam-runtime`; the import
+  name stays `vam`. ruff is clean on `vam`, `tests`, `benchmarks`, `scripts`, `examples`.
 
 ## Decision
-*(to fill)*
+R6 done except for seeing CI green, which needs a push. Ship the ensemble, not a retrained head. The 13 → 6.6 MB
+fp16 cast changes no held-out number. Next 016 (docs).

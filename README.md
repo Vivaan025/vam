@@ -7,29 +7,39 @@ layer in between for video: deciding which frames to process, reusing computatio
 and running recognition or action-prediction models on long or live video without the cost
 growing linearly with video length. `vam` is that layer.
 
+```bash
+pip install vam-runtime[hf]        # import name: vam · Python 3.10–3.12 · Linux, Windows, macOS (CPU)
+```
+
 ```python
 import vam
 
 video = vam.load_video("clip.mp4")
 model = vam.get_model("videomae-base-kinetics")
 
-out = model(video, sampler=vam.MotionSampler(16))
+out = model(video, sampler=vam.KeyframeSampler(8))        # keyframe scan + packaged class-free scorer
 print(out.top_k(3))
 
-for chunk in vam.Stream(0, window=16, hop=8):   # webcam
+sampler = vam.BudgetedSampler(150, model, calibrate_on=["a.mp4", "b.mp4", "c.mp4"])
+out = model(video, sampler=sampler)                        # frames, refinement and stride chosen for 150 ms
+
+for chunk in vam.Stream(0, window=16, hop=8):              # webcam
     print(model(chunk).top_k(1))
 ```
+
+[Quickstart](docs/quickstart.md) · [API reference](docs/api.md) · [Results](docs/results/) ·
+[Experiment log](docs/experiments/README.md) · [Roadmap](docs/roadmap.md)
 
 ## Design
 
 ```
          vam API            Video · FrameBatch · ActionOutput · Stream
       ───────────────
-         Samplers           Uniform · Motion · Keyframe (learned scorer)
+         Samplers           Uniform · Motion · Keyframe (learned scorer) · Budgeted (ms)
       ───────────────
-       Model adapters       Hugging Face video classifiers · (policies / VLAs: next)
+       Model adapters       Hugging Face · torchvision · policies (OpenVLA)
       ───────────────
-         Runtime            Profiler · FeatureCache · Scheduler · (async pipeline: next)
+         Runtime            keyframe scan · parallel window decode · cost model + scheduler · Profiler · FeatureCache
       ───────────────
       PyTorch / CUDA        backend, never reimplemented
 ```
@@ -42,7 +52,7 @@ Three rules keep this a library rather than a model zoo:
    agent policies fill `actions`. Everything above the model works for both.
 3. **PyTorch is the backend.** Custom kernels only replace an op after profiling proves it matters.
 
-## Status: v0.5 · see `docs/experiments/` for the log and `docs/roadmap.md` for the path to v0.1 on PyPI
+## Status: v0.1.0 · wheel builds and installs on Linux and Windows (CI); see `docs/experiments/` for the log
 
 On 200 untrimmed THUMOS14 videos (RTX 5090, frozen VideoMAE-base + a linear probe fitted on UCF101):
 
@@ -94,7 +104,8 @@ the recorded ones on BridgeData (Δxyz correlation 0.97) and the scheduler's cos
 - [x] Generality within domain: held-out split, 1080p, HEVC, VP9, keyframe density (`docs/results/thumos14_generality.md`)
 - [x] Second domain: Charades, a negative result that states the method's boundary (`docs/results/charades.md`)
 - [x] Robustness: documented errors, no hangs, degenerate inputs answer uniform, scheduler fallback (`docs/results/robustness.md`)
-- [ ] Packaging + CI; docs (see `docs/roadmap.md`)
+- [x] Packaging: `vam-runtime` wheel with the packaged scorer, bounded dependency ranges, CI on Linux + Windows (015)
+- [x] Docs: quickstart, API reference, `BudgetedSampler`, executable snippets (016)
 - [ ] GPU windowed decode (NVDEC) — deferred past v0.1
 - [ ] Feature reuse in the model forward path
 - [ ] Async decode + GPU pipeline

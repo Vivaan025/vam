@@ -4,6 +4,8 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-05 | Results of experiment 015 (R6 done): wheel verified on Windows + Linux; packaged scorer is the fp16 fold ensemble (held-out 0.863 / 0.901 / 0.915 reproduced; a single retrained head lost 4 pts at 4 frames) | `docs/experiments/015-packaging.md`, `vam/weights/`, `README.md`, `docs/roadmap.md` | [015](experiments/015-packaging.md) |
+| 2026-11-05 | `vam.BudgetedSampler(budget_ms, model, calibrate_on=[...])`: the scheduler behind one sampler class; `docs/quickstart.md`, `docs/api.md`, `tests/test_docs.py` (executable snippets, `__all__` coverage) | `vam/runtime/budget.py`, `docs/`, `tests/test_docs.py` | [016](experiments/016-docs.md) |
 | 2026-11-05 | Plan for experiment 016 (docs for v0.1, roadmap R7: quickstart, API reference, two notebooks, `BudgetedSampler` helper) | `docs/experiments/016-docs.md` | [016](experiments/016-docs.md) |
 | 2026-11-05 | Plan for experiment 015 (packaging + CI, roadmap R6: `vam-runtime` wheel, bounded ranges, packaged release scorer head, GitHub Actions on Linux + Windows) | `docs/experiments/015-packaging.md` | [015](experiments/015-packaging.md) |
 | 2026-11-05 | Results of experiment 014 (model coverage, R5 done): R(2+1)D-18 keeps the selection gain (+9 / +15.5 / +15.5), OpenVLA-7B runs through `Stream` and the cost model | `docs/results/model_coverage.md`, `README.md`, `docs/roadmap.md`, `docs/study_guide.html` | [014](experiments/014-model-coverage.md) |

@@ -82,7 +82,7 @@ def test_packaged_scorer_weights_load_without_clip():
     from vam.sampling.learned import DEFAULT_WEIGHTS, LearnedScorer
 
     path = resources.files("vam.weights") / DEFAULT_WEIGHTS
-    assert path.is_file() and path.stat().st_size < 5_000_000
+    assert path.is_file() and path.stat().st_size < 8_000_000  # fp16 ensemble of the 5 fold heads, 6.6 MB
 
     class FakeEmbedder:
         device = "cpu"
@@ -92,7 +92,8 @@ def test_packaged_scorer_weights_load_without_clip():
             return torch.randn(len(thumbs), 512, generator=g)
 
     sc = LearnedScorer.load(str(path), FakeEmbedder(), device="cpu")
-    assert sc.folds == {} and len(sc.heads) == 1 and not sc.use_zs
+    assert sc.folds == {} and len(sc.heads) == 5 and not sc.use_zs
+    assert next(sc.heads[0].parameters()).dtype == torch.float32  # fp16 on disk, float32 in memory
     times = np.arange(0, 40, 2.0)
     kf = Keyframes(times, np.arange(len(times)) * 20, np.zeros((len(times), 8, 8, 3), np.uint8), 10.0, 40.0, 400)
     out = sc(kf)

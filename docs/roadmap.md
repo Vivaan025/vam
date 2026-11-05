@@ -11,7 +11,7 @@ entry when it lands.
 | R3 ✔ | Generality (011: held-out split, 1080p, HEVC, VP9, keyframe density; 012: Charades, boundary = action coverage) | every number so far is 320×180 H.264 sports video with 20 classes | 1 week | 2026-11-16 |
 | R4 ✔ | Robustness (013, done 2026-11-05): `vam.errors`, forkserver pool + scan timeout, degenerate inputs → uniform, scheduler uniform fallback | a library fails in the field on inputs the benchmark never sees | 3 days | 2026-11-19 |
 | R5 ✔ | Model coverage (014, done 2026-11-05): torchvision R(2+1)D-18 / R3D-18 / MViT-v2-S, `ActionPolicy` + OpenVLA-7B; selection gain holds on the second family, policy runs through `Stream` and the cost model | the unified-API claim needs both uses proven | 1 week | 2026-11-26 |
-| R6 | Packaging: PyPI wheel, pinned dependency ranges, CI running the tests on Linux and Windows | installability | 2 days | 2026-11-28 |
+| R6 ✔ | Packaging (015, done 2026-11-05): `vam-runtime` wheel with the packaged scorer, bounded ranges, GitHub Actions on Linux + Windows | installability | 2 days | 2026-11-28 |
 | R7 | Docs: quickstart, API reference, two example notebooks | adoption | 2–3 days | 2026-12-01 |
 
 Deferred past v0.1: NVDEC / torchcodec decode (008). The decode stage is a ~90 ms seek-bound floor that is
