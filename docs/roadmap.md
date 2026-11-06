@@ -18,4 +18,15 @@ Deferred past v0.1: NVDEC / torchcodec decode (008). The decode stage is a ~90 m
 already below uniform sampling's latency; hardware decode would add an install burden that costs users more
 than it saves.
 
+## After v0.1: the comparison a reviewer asks for
+
+**Written:** 2026-11-07. v0.1.0 is released. Every number so far is a linear probe on 200 THUMOS14 videos;
+the adaptive-frame-selection literature reports mAP on ActivityNet-1.3 and top-1 on Mini-Kinetics with a
+trained ResNet-50, against each other. These two items put `vam` in that table.
+
+| # | item | why | estimate | target |
+|---|---|---|---|---|
+| R8 | Standard benchmarks (017): ActivityNet-1.3 val and Mini-Kinetics under the FrameExit protocol (1 fps, ResNet-50, mAP / top-1, GFLOPs), FrameExit checkpoint reproduced first; FCVID once the data request is granted | the benchmark the field recognises | 1-2 weeks (data-bound) | 2026-11-21 |
+| R9 | Prior samplers (018): FrameExit, OCSampler, AR-Net from released weights; SCSampler, AdaFrame, SMART re-implemented; one table of mAP x GFLOPs x measured ms on the same machine and classifier | "how does it do against at least two of them under the same backbone and budget" | 2-3 weeks | 2026-12-12 |
+
 Progress is tracked in [`CHANGELOG.md`](CHANGELOG.md) and [`experiments/README.md`](experiments/README.md).

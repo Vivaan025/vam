@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-07 | Experiments 017 (standard benchmarks) and 018 (prior samplers) opened; roadmap R8 / R9 added; data fetch started on the server (K400 val shards, one ActivityNet mirror shard, OCSampler / FrameExit / AR-Net code) | `docs/experiments/017-standard-benchmarks.md`, `018-prior-samplers.md`, `docs/roadmap.md` | [017](experiments/017-standard-benchmarks.md), [018](experiments/018-prior-samplers.md) |
 | 2026-11-06 | `LICENSE` file added (Apache-2.0, matching `pyproject.toml`) ahead of the PyPI upload of `vam-runtime` 0.1.0 | `LICENSE` | [015](experiments/015-packaging.md) |
 | 2026-11-06 | **v0.1.0** tagged: first CI run (on 3ccd9be) green on all six jobs (ubuntu + windows × py3.11 / 3.12, wheel + quickstart on both) | tag `v0.1.0`, `.github/workflows/ci.yml` | [015](experiments/015-packaging.md) |
 | 2026-11-06 | Results of experiment 016 (R7 done, v0.1.0 feature-complete): notebooks `examples/01_frame_selection.ipynb`, `02_latency_budget.ipynb` executed on the server; `default_scorer` cached per (device, model); scan pool exit hook waits for workers | `examples/`, `vam/sampling/learned.py`, `vam/runtime/scan.py`, `docs/roadmap.md` | [016](experiments/016-docs.md) |
