@@ -27,8 +27,8 @@ for chunk in vam.Stream(0, window=16, hop=8):              # webcam
     print(model(chunk).top_k(1))
 ```
 
-[Quickstart](docs/quickstart.md) · [API reference](docs/api.md) · [Results](docs/results/) ·
-[Experiment log](docs/experiments/README.md) · [Roadmap](docs/roadmap.md)
+[Quickstart](https://github.com/Vivaan025/vam/blob/main/docs/quickstart.md) · [API reference](https://github.com/Vivaan025/vam/blob/main/docs/api.md) · [Results](https://github.com/Vivaan025/vam/tree/main/docs/results/) ·
+[Experiment log](https://github.com/Vivaan025/vam/blob/main/docs/experiments/README.md) · [Roadmap](https://github.com/Vivaan025/vam/blob/main/docs/roadmap.md)
 
 ## Design
 
