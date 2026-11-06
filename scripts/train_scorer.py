@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from vam.data import THUMOS14, Charades
+from vam.data import THUMOS14, ActivityNet, Charades
 from vam.runtime.scan import scan_keyframes
 from vam.sampling import ClipScorer
 from vam.sampling.learned import ScorerHead, build_features, gap_window_targets
@@ -25,7 +25,12 @@ from vam.sampling.learned import ScorerHead, build_features, gap_window_targets
 
 def cache_features(root: str, out: Path, device: str, thumb: int, dataset: str = "thumos14", split: str = "val",
                    limit: int | None = None) -> dict:
-    ds = Charades(root, split) if dataset == "charades" else THUMOS14(root, split)
+    if dataset == "charades":
+        ds = Charades(root, split)
+    elif dataset == "activitynet":  # 017: the 2,500-video train subset; class-free head, so the 200 prompts only feed `zs`
+        ds = ActivityNet(root, split)
+    else:
+        ds = THUMOS14(root, split)
     if limit:
         ds.videos = ds.videos[:limit]
     clip = ClipScorer(ds.classes, device=device)
@@ -118,7 +123,7 @@ def evaluate(head, x, y, vid, device) -> dict:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default="data/thumos14")
-    ap.add_argument("--dataset", default="thumos14", choices=["thumos14", "charades"], help="012: retrain the scorer on another dataset")
+    ap.add_argument("--dataset", default="thumos14", choices=["thumos14", "charades", "activitynet"], help="012 / 017: retrain the scorer on another dataset")
     ap.add_argument("--split", default="val")
     ap.add_argument("--limit", type=int, default=None, help="cache features for the first N videos only (012: the 1,000-video Charades test subset)")
     ap.add_argument("--cache", default="results/cache/scorer_feats.pt")
