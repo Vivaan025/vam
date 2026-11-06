@@ -21,6 +21,10 @@ def _load_adapters() -> None:
         import vam.models.torchvision  # noqa: F401  (014: torchvision video classifiers)
     except ImportError:
         pass
+    try:
+        import vam.models.frameexit  # noqa: F401  (017: FrameExit ResNet-50 classifier, needs torchvision)
+    except ImportError:
+        pass
     import vam.models.policy  # noqa: F401  (014: FakePolicy always; OpenVLA needs transformers at call time)
 
 

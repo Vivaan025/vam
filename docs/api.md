@@ -61,6 +61,7 @@ Every public name, its signature, one line of purpose, and the experiment that j
 | `register` | `@register(name)` on a factory `fn(**kw) -> VideoActionModel` | Add a model to `get_model` | 001 |
 | `HFVideoClassifier` | `HFVideoClassifier(name, device=None, dtype=float16, use_hf_processor=False)` | Any `AutoModelForVideoClassification`; registered: `videomae-base-kinetics`, `videomae-small-kinetics`, `timesformer-base-k400` | 001, 004 |
 | `HFFeatureExtractor`, `LinearProbe` | `HFFeatureExtractor(name, ...)`.`features(batch)`; `LinearProbe(extractor, num_classes, class_names=None)`; `LinearProbe.fit_head(features, labels, num_classes, epochs=100, lr=1e-2, weight_decay=1e-4, device="cpu")`; `save_head(path)` / `load_head(path)` | Pooled backbone features and a linear head, how every benchmark measures accuracy | 001 |
+| `FrameExitModel` | `FrameExitModel(dataset='activitynet', checkpoint=None, device=None, dtype=float16)`; `forward_frames(batch)` pools K frames and answers with the head trained for K; `exit_forward(batch)` runs FrameExit's own early exit; `frame_features(batch)` | the shared ResNet-50 classifier of the prior-work comparison; registered `frameexit-activitynet`, `frameexit-minikinetics`; checkpoints from the FrameExit release (`VAM_FRAMEEXIT_DIR`) | 017 |
 | `TorchvisionVideoClassifier` | `TorchvisionVideoClassifier(arch, device=None, dtype=float16)`; `features(batch)`; `feature_dim` | Kinetics-400 R(2+1)D-18, R3D-18, MViT-v2-S; registered `r2plus1d-18-k400`, `r3d-18-k400`, `mvit-v2-s-k400` | 014 |
 | `ActionPolicy` | `ActionPolicy(instruction="", state=None)`; implement `act(frames, instruction, state) -> (T, action_dim)`; `forward_frames(batch, instruction=None, state=None)` | A policy is a `VideoActionModel` with `default_num_frames=1` that fills `actions` | 014 |
 | `FakePolicy` | `FakePolicy(action_dim=7, **kw)`; registered `fake-policy` | Deterministic stand-in for tests and calibration | 014 |
@@ -72,6 +73,8 @@ Every public name, its signature, one line of purpose, and the experiment that j
 |---|---|---|---|
 | `UCF101`, `Clip` | `UCF101(root, split="train", fold=1, limit=None, seed=0)`; iterates `Clip(path, label, ...)` with `.video()` | Trimmed clips; the probe's training set | 001 |
 | `THUMOS14`, `UntrimmedVideo`, `Segment` | `THUMOS14(root, split="val", require_video=True)`; `UntrimmedVideo(path, video_id, segments)` with `.video()`, `.classes`, `.action_fraction(duration)`; `Segment(class_name, start, end)` | Untrimmed long video with temporal annotations; the main benchmark | 002 |
+| `ActivityNet` | `ActivityNet(root, split='validation')`; `.videos`, `.classes`, `.labels(uv)`, `.missing` | ActivityNet-1.3 untrimmed videos with multi-label annotations in FrameExit's class order | 017 |
+| `MiniKinetics` | `MiniKinetics(root, split='val')`; same interface | the AR-Net 200-class subset of Kinetics-400 val, trimmed 10 s clips | 017 |
 | `Charades` | `Charades(root, split="test", require_video=True, min_segments=1)` | Second domain (the negative result); THUMOS14-shaped | 012 |
 
 Download helpers live in `scripts/` (`download_thumos14.py`, `download_charades.py`); the benchmarks in

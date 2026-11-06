@@ -4,6 +4,7 @@ Newest first. One line per change; experiments link to `docs/experiments/`.
 
 | date | change | where | experiment |
 |---|---|---|---|
+| 2026-11-07 | `FrameExitModel` adapter (FrameExit's ResNet-50 classifier, fixed-K and early-exit modes), `ActivityNet` / `MiniKinetics` dataset classes, `benchmarks/eval_activitynet.py` (mAP, GMACs, measured ms per sampler) | `vam/models/frameexit.py`, `vam/data/activitynet.py`, `benchmarks/eval_activitynet.py`, `tests/test_frameexit.py`, `docs/api.md` | [017](experiments/017-standard-benchmarks.md) |
 | 2026-11-07 | Experiments 017 (standard benchmarks) and 018 (prior samplers) opened; roadmap R8 / R9 added; data fetch started on the server (K400 val shards, one ActivityNet mirror shard, OCSampler / FrameExit / AR-Net code) | `docs/experiments/017-standard-benchmarks.md`, `018-prior-samplers.md`, `docs/roadmap.md` | [017](experiments/017-standard-benchmarks.md), [018](experiments/018-prior-samplers.md) |
 | 2026-11-06 | `LICENSE` file added (Apache-2.0, matching `pyproject.toml`) ahead of the PyPI upload of `vam-runtime` 0.1.0 | `LICENSE` | [015](experiments/015-packaging.md) |
 | 2026-11-06 | **v0.1.0** tagged: first CI run (on 3ccd9be) green on all six jobs (ubuntu + windows × py3.11 / 3.12, wheel + quickstart on both) | tag `v0.1.0`, `.github/workflows/ci.yml` | [015](experiments/015-packaging.md) |
