@@ -144,7 +144,7 @@ class FrameExitModel(VideoActionModel):
     @torch.inference_mode()
     def exit_forward(self, batch: FrameBatch, order: list[int] | None = None) -> tuple[torch.Tensor, int]:
         """Run FrameExit's early exit over the batch in its training order. Returns (logits, frames used)."""
-        feats = self.frame_features(batch)
+        feats = self.frame_features(batch).to(self._dtype)  # heads and gates run in the model dtype
         t_total = int(feats.shape[0])
         order = order if order is not None else (INPUT_ORDER if t_total == 10 else list(range(t_total)))
         z_prev = None
@@ -154,7 +154,7 @@ class FrameExitModel(VideoActionModel):
                 z = torch.maximum(z, z_prev)
             if t == 0:
                 y = self.classifiers[0](z)
-                exited = bool(torch.softmax(y, 0).max() > self.first_threshold)
+                exited = bool(torch.softmax(y.float(), 0).max() > self.first_threshold)
             elif t < len(order) - 1:
                 exited = bool(self.exit_selector[t - 1](z[None], z_prev[None])[0, 0] == 0)
             else:

@@ -47,6 +47,7 @@ def test_fixed_mode_uses_head_for_frame_count(fe):
 
 def test_exit_forward_returns_logits_and_frames_used(fe):
     logits, used = fe.exit_forward(_batch(10))
+    assert logits.dtype == torch.float32
     assert logits.shape == (200,) and 1 <= used <= 10
     # forced order on a shorter batch
     logits, used = fe.exit_forward(_batch(3))
