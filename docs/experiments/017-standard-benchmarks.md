@@ -59,7 +59,32 @@ GFLOPs per video (sampler + classifier), measured select / decode / infer / tota
 - FrameExit's checkpoint was trained with PyTorch 1.3; state-dict keys may need mapping.
 
 ## Results
-pending
+### Interim, 2026-11-07: smoke run on the first 339 val videos (v1-2 part of val), RTX 5090
+The FrameExit checkpoint loads and runs through `vam`'s decode. On this subset:
+
+| arm | mAP | hit@1 | frames | GMACs | p50 / p90 ms |
+|---|---|---|---|---|---|
+| frameexit (its early exit) | 0.790 | 0.667 | 6.17 | 25.4 | 120 / 300 |
+| fe-uniform-10 (its frames, no exit) | 0.796 | 0.673 | 10 | 41.2 | 117 / 319 |
+| uniform-4 | 0.781 | 0.646 | 4 | 16.5 | 56 / 139 |
+| uniform-6 | 0.797 | 0.687 | 6 | 24.7 | 80 / 206 |
+| uniform-8 | 0.816 | 0.696 | 8 | 33.0 | 106 / 291 |
+| uniform-10 | 0.825 | 0.690 | 10 | 41.2 | 129 / 355 |
+| keyframe-4 (THUMOS scorer, refine) | 0.718 | 0.602 | 3.9 | 340 | 129 / 386 |
+| keyframe-6 | 0.754 | 0.661 | 5.8 | 437 | 130 / 387 |
+| keyframe-8 | 0.765 | 0.649 | 7.7 | 535 | 141 / 436 |
+
+- FrameExit's own numbers sit where its paper puts them (0.790 on this easier subset vs 0.761 published on
+  the full val at 24.7 GFLOPs); H1 is decided on the full val.
+- **The THUMOS-trained keyframe sampler loses to uniform on ActivityNet at every frame count, on both axes.**
+  ActivityNet val action coverage is median 0.72 (mean 0.66, 71 % of videos above 0.5; THUMOS14 0.23,
+  Charades 0.95), so by the 012 rule the headroom for any selector is small, and the FrameExit heads were
+  trained on uniformly spread frames. The GMACs column is dominated by the CLIP scorer over ~70 keyframes
+  plus refinement candidates per two-minute video.
+- Next, in order: `oracle-K` (ceiling from the annotations; if the oracle itself is at or below uniform the
+  benchmark is Charades-shaped and the result is reported as such), `kfnr-K` (no refinement, to see the cost
+  without the candidate pass), the scorer retrained on the ActivityNet train subset (H3), and a keyframe cap.
+
 
 ## Decision
 pending

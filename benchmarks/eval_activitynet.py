@@ -5,6 +5,8 @@ Arms (``--arms``):
   fe-uniform-10  the same 10 frames, no exit, head for 10 frames (FrameExit's upper bound)
   uniform-K      vam UniformSampler(K) -> head for K frames
   keyframe-K     vam KeyframeSampler(K) with the packaged scorer (or --scorer-head), refinement as in 007
+  kfnr-K         the same without refinement (scores keyframes only)
+  oracle-K       uniform inside the annotated segments (ground truth; the ceiling for any selector)
   budget-B       vam BudgetedSampler(B ms), cost model calibrated on this machine
 
 GMACs follow FrameExit's accounting (4.12 per ResNet-50 frame) plus 4.4 per CLIP ViT-B/32 image the sampler
@@ -29,9 +31,36 @@ import vam
 from vam.core import FrameBatch
 from vam.data import ActivityNet, MiniKinetics
 from vam.models.frameexit import GMACS_PER_FRAME, FrameExitModel
-from vam.sampling import KeyframeSampler, UniformSampler
+from vam.sampling import KeyframeSampler, Sampler, UniformSampler
 
 CLIP_GMACS = 4.4  # ViT-B/32 image tower at 224, same FLOPs-as-MACs convention FrameExit uses for ResNet-50
+
+
+class OracleSampler(Sampler):
+    """Evenly spaced frames restricted to the annotated segments (as in benchmarks/eval_thumos14.py)."""
+
+    def __init__(self, num_frames: int, uv=None):
+        super().__init__(num_frames)
+        self.uv = uv
+
+    def select(self, video):
+        fps = video.fps
+        ranges = []
+        for s in self.uv.segments:
+            a, b = int(s.start * fps), min(int(s.end * fps), video.num_frames - 1)
+            if b > a:
+                ranges.append((a, b))
+        if not ranges:
+            return UniformSampler(self.num_frames).select(video)
+        lengths = np.array([b - a for a, b in ranges], dtype=float)
+        total = lengths.sum()
+        targets = (np.arange(self.num_frames) + 0.5) / self.num_frames * total
+        bounds = np.cumsum(lengths)
+        out = []
+        for t in targets:
+            k = min(int(np.searchsorted(bounds, t, side="right")), len(ranges) - 1)
+            out.append(int(ranges[k][0] + t - (bounds[k] - lengths[k])))
+        return sorted(set(out))
 
 
 def frameexit_indices(video, n: int = 10, fps_extract: float = 1.0) -> list[int]:
@@ -103,6 +132,10 @@ def main() -> None:
         if kind == "keyframe":
             k = int(val)
             return KeyframeSampler(k, scorer, refine=None if args.no_refine else scorer)
+        if kind == "kfnr":
+            return KeyframeSampler(int(val), scorer, refine=None)
+        if kind == "oracle":
+            return OracleSampler(int(val))
         if kind == "budget":
             return vam.BudgetedSampler(float(val), model, calibrate_on=[uv.path for uv in ds.videos[:3]], scorer=scorer)
         raise ValueError(arm)
@@ -113,7 +146,7 @@ def main() -> None:
     with out.open("a") as f:
         for arm in args.arms:
             sampler = make(arm)
-            scores, ys, ms_tot, gmacs, used, n_fb = [], [], [], [], [], 0
+            scores, ys, ms_tot, gmacs, used, n_fb, n_scored_all = [], [], [], [], [], 0, []
             t_start = time.time()
             for uv in ds:
                 try:
@@ -122,6 +155,8 @@ def main() -> None:
                     print(f"skip {uv.video_id}: {e}", flush=True)
                     continue
                 p = vam.Profiler()
+                if isinstance(sampler, OracleSampler):
+                    sampler.uv = uv
                 try:
                     if sampler is None:
                         with p.span("select"):
@@ -134,6 +169,7 @@ def main() -> None:
                             else:
                                 logits, k_used = model(batch).logits, len(idx)
                         extra = 0.0
+                        n_scored_all.append(0)
                     else:
                         with p.span("select"):
                             idx = sampler.select(v)
@@ -147,6 +183,7 @@ def main() -> None:
                         fine = getattr(ks, "last_fine", None) if isinstance(ks, KeyframeSampler) else None
                         n_scored += len(fine[0]) if fine and fine[0] is not None else 0
                         extra = CLIP_GMACS * n_scored
+                        n_scored_all.append(n_scored)
                         n_fb += getattr(ks, "last_fallback", None) is not None
                     if device == "cuda":
                         torch.cuda.synchronize()
@@ -186,10 +223,10 @@ def main() -> None:
             hit1 = float(np.mean(Y[np.arange(len(S)), S.argmax(1)] > 0))
             a = np.array(ms_tot)
             print(f"{arm:14s} n={len(S):5d}  mAP={mAP:.4f}  hit@1={hit1:.4f}  frames={np.mean(used):.2f}  GMACs={np.mean(gmacs):.1f}  "
-                  f"p50={np.median(a):.0f} p90={np.percentile(a, 90):.0f} ms  fallback={n_fb}  ({(time.time() - t_start) / len(S) * 1000:.0f} ms/video wall)", flush=True)
+                  f"scored={np.mean(n_scored_all):.0f}  p50={np.median(a):.0f} p90={np.percentile(a, 90):.0f} ms  fallback={n_fb}  ({(time.time() - t_start) / len(S) * 1000:.0f} ms/video wall)", flush=True)
             f.write(json.dumps({"summary": True, "arm": arm, "dataset": args.dataset, "n": len(S), "mAP": mAP, "hit1": hit1,
                                 "frames": float(np.mean(used)), "gmacs": float(np.mean(gmacs)), "p50_ms": float(np.median(a)),
-                                "p90_ms": float(np.percentile(a, 90)), "fallback": n_fb, "gpu": gpu, "scorer_head": args.scorer_head}) + "\n")
+                                "p90_ms": float(np.percentile(a, 90)), "fallback": n_fb, "scored": float(np.mean(n_scored_all)), "gpu": gpu, "scorer_head": args.scorer_head}) + "\n")
             f.flush()
     vam.runtime.shutdown_pools()
 
