@@ -81,9 +81,32 @@ The FrameExit checkpoint loads and runs through `vam`'s decode. On this subset:
   Charades 0.95), so by the 012 rule the headroom for any selector is small, and the FrameExit heads were
   trained on uniformly spread frames. The GMACs column is dominated by the CLIP scorer over ~70 keyframes
   plus refinement candidates per two-minute video.
-- Next, in order: `oracle-K` (ceiling from the annotations; if the oracle itself is at or below uniform the
-  benchmark is Charades-shaped and the result is reported as such), `kfnr-K` (no refinement, to see the cost
-  without the candidate pass), the scorer retrained on the ActivityNet train subset (H3), and a keyframe cap.
+- **The ceiling is flat.** Same subset, same classifier, frames taken uniformly *inside the annotated
+  segments* (ground truth):
+
+  | frames | uniform | oracle | gap | kfnr (THUMOS scorer, no refinement) | GMACs kfnr | scored keyframes |
+  |---|---|---|---|---|---|---|
+  | 4 | 0.781 | 0.794 | +1.4 | 0.748 | 166 | 34 |
+  | 6 | 0.797 | 0.810 | +1.3 | 0.772 | 174 | 34 |
+  | 8 | 0.816 | 0.814 | −0.2 | 0.789 | 181 | 34 |
+  | 10 | 0.825 | 0.818 | −0.7 | – | – | – |
+
+  A perfect selector gains 1.4 mAP at 4 frames and nothing from 8 frames up. On THUMOS14 the same gap was
+  +17 points at 4 frames. ActivityNet under the FrameExit protocol is therefore Charades-shaped (012): the
+  action fills most of the video, a per-frame ResNet-50 with max pooling sees it from almost any frame, and
+  "which frames" is not the question the benchmark asks. The published gains on this benchmark (FrameExit,
+  OCSampler, AR-Net) are compute savings at near-constant accuracy, not accuracy from finding the action.
+- Without refinement the scan costs 34 CLIP images per video (166 GMACs at 4 frames against 16.5 for the
+  ResNet-50 itself) and still loses 3 points to uniform: the THUMOS head's ranking does not transfer, and the
+  gap-window placement concentrates frames where the FrameExit heads, trained on spread-out frames, expect
+  coverage.
+- Consequences for 018: the comparison on ActivityNet is on the cost axis at matched accuracy, and the honest
+  entry for `vam` there is the scheduler's uniform fallback (013), which should choose uniform on this
+  footage; the accuracy contribution of keyframe selection is a long-video, low-coverage result (THUMOS14
+  shape) and is reported as such. H2 is expected to fail on ActivityNet and H4 to hold on Mini-Kinetics.
+- Still to run: full val (queued), H3 (ActivityNet-trained head: can it recover the 1.4 points at 4 frames
+  at a scan cost that fits?), and one clip-level backbone (VideoMAE probe) on ActivityNet to separate
+  "coverage" from "per-frame classifier" as the cause of the flat ceiling.
 
 
 ## Decision
