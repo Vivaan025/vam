@@ -7,6 +7,7 @@ import torch
 import vam
 from vam.core import FrameBatch
 from vam.sampling import OCSampler, uniform_sample_frames
+from vam.models.arnet import arnet_val_indices
 from vam.sampling.prior import MobileNetV2TSMPolicy, temporal_shift
 
 
@@ -86,3 +87,40 @@ def test_ocsampler_selects_from_candidates_and_caches(h264_video):
     a = fe.logits_from_features(feats)
     fe.fixed_head = None
     assert not torch.allclose(a, fe.logits_from_features(feats))
+
+
+def test_arnet_val_indices_match_reference():
+    for n in (5, 16, 17, 100, 3153):
+        if n > 16:
+            tick = n / 16.0
+            ref = [int(tick / 2.0 + tick * x) for x in range(16)]
+        else:
+            ref = list(range(n)) + [n - 1] * (16 - n)
+        assert arnet_val_indices(n) == ref
+
+
+@pytest.mark.parametrize("mode", ["scsampler", "ada"])
+def test_arnet_modes_run_and_account(mode, tmp_path):
+    pytest.importorskip("torchvision")
+    from vam.models.arnet import ARNetModel
+
+    torch.manual_seed(0)
+    m = ARNetModel(mode, device="cpu")
+    g = torch.Generator().manual_seed(1)
+    batch = FrameBatch(torch.randint(0, 255, (16, 64, 96, 3), generator=g, dtype=torch.uint8),
+                       torch.arange(16).float(), torch.arange(16))
+    out = m(batch)
+    assert out.logits.shape == (200,) and out.features.shape == (16, 1280)
+    assert 1 <= m.last_frames_used <= 16 and m.last_gmacs > 0
+    assert len(m.last_decisions) == (10 if mode == "scsampler" else 16)
+    if mode == "scsampler":
+        assert m.last_frames_used == 10 and m.last_decisions == sorted(m.last_decisions)
+        assert abs(m.last_gmacs - (16 * m.gmacs_policy + 10 * m.gmacs_backbone[0])) < 1e-6
+        assert 3.9 < m.gmacs_backbone[0] < 4.3  # ResNet-50 at 224
+    else:
+        assert m.gmacs_backbone[0] > m.gmacs_backbone[1] > m.gmacs_backbone[2] > m.gmacs_policy
+    # checkpoint keys in the released layout (module., rnn., lite_backbone.features., base_model_list.N, new_fc_list.N)
+    state = {"module." + k: v for k, v in m.state_dict().items()}
+    torch.save({"state_dict": state, "epoch": 1}, tmp_path / "ck.pth.tar")
+    m2 = ARNetModel(mode, checkpoint=tmp_path / "ck.pth.tar", device="cpu")
+    assert all(torch.equal(a, b) for a, b in zip(m.state_dict().values(), m2.state_dict().values()))

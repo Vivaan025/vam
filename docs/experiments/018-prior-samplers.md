@@ -81,5 +81,21 @@ mAP on ActivityNet-1.3 val (multi-label), GFLOPs per video, measured ms per vide
   uniform-6 (6-frame head) 0.853 at 24.7 GMACs, 96 ms. Full val running (`results/logs/queue018.sh`).
 - Still to run: ActivityNet val 10to6 / 10to5; Mini-K 10to4 / 10to5; uniform-K through the 10-frame head.
 
+### 2026-11-07: AR-Net and its SCSampler ported (`vam/models/arnet.py`), not yet run
+- Both run from the released `.pth.tar` files (`exp0_res_ada`, `exp1_res_scsampler`; loaded with
+  `weights_only=True` and an allowlist for the argparse / numpy objects pickled beside the weights). AR-Net's
+  classifier is its own TSN (torchvision ResNet-50/34/18 + fresh fc), not FrameExit's, so its rows share the
+  dataset and the frame protocol (16 frames at `int(tick/2 + tick*x)`, short side 256, centre crop 224) but not
+  the classifier; the literature table (OCSampler Table 1) mixes them the same way.
+- SCSampler as AR-Net re-implements it: MobileNetV2 on all 16 frames, saliency = max class logit of its own
+  head, ResNet-50 on the top-10, logits averaged. The test script feeds the policy the 224 crop
+  (`--policy_input_offset 0`), which costs 45.7 GMACs; the paper's 42.0 GFLOPs implies the policy at 84 px
+  (41.9). Both are run (`--arnet-sc-policy-px 224 / 84`) and reported.
+- AR-Net adaptive: MobileNetV2 at 84 px -> LSTM(512) -> 7 actions per frame (ResNet-50 @ 224, ResNet-34 @ 168,
+  ResNet-18 @ 112, policy head, skip 1 / 2 / 4); chosen logits averaged. The released test samples the action
+  with Gumbel noise at tau = 1e-6; we take the arg max (deterministic limit) and say so. Per-option MACs are
+  measured with `FlopCounterMode` at init (ResNet-50 @ 224 = 4.1, matching the 4.12 convention of 017).
+- Still to run: ActivityNet val `arnet-ada`, `arnet-sc` (224 and 84) against published 73.8 / 33.5 and 72.9 / 42.0.
+
 ## Decision
 pending

@@ -10,6 +10,9 @@ Arms (``--arms``):
   budget-B       vam BudgetedSampler(B ms), cost model calibrated on this machine
   ocsampler-K    OCSampler as released (018): MobileNetV2-TSM policy over 10 frames at 128 px, top-K, 10-frame head
                  (--ocsampler-checkpoint, default $VAM_OCSAMPLER_CHECKPOINT)
+  arnet-ada      AR-Net as released (018): its own TSN classifier, 16 frames, per-frame resolution / skip policy
+  arnet-sc       AR-Net's SCSampler re-implementation: MobileNetV2 scores 16 frames, ResNet-50 on the top-10
+                 (--arnet-ada-checkpoint / --arnet-sc-checkpoint, or $VAM_ARNET_{ADA,SCSAMPLER}_CHECKPOINT)
 
 GMACs follow FrameExit's accounting (4.12 per ResNet-50 frame) plus 4.4 per CLIP ViT-B/32 image the sampler
 scores (keyframes and refinement candidates). Measured milliseconds are select / decode / infer per video.
@@ -32,6 +35,7 @@ import torch
 import vam
 from vam.core import FrameBatch
 from vam.data import ActivityNet, MiniKinetics
+from vam.models.arnet import ARNetModel, arnet_val_indices
 from vam.models.frameexit import GMACS_PER_FRAME, FrameExitModel
 from vam.sampling import KeyframeSampler, OCSampler, Sampler, UniformSampler
 
@@ -97,6 +101,9 @@ def main() -> None:
     ap.add_argument("--scorer-head", default=None, help="LearnedScorer weights; default = packaged THUMOS scorer")
     ap.add_argument("--no-refine", action="store_true")
     ap.add_argument("--ocsampler-checkpoint", default=None)
+    ap.add_argument("--arnet-ada-checkpoint", default=None)
+    ap.add_argument("--arnet-sc-checkpoint", default=None)
+    ap.add_argument("--arnet-sc-policy-px", type=int, default=224, help="test script feeds the 224 crop to the MobileNetV2 (offset 0); the paper's 42.0 GFLOPs implies 84")
     ap.add_argument("--resize-first", type=int, default=0, help="resize the short side to this before the 224 resize (FrameExit extracted JPEGs at 350 / 256)")
     ap.add_argument("--device", default=None)
     ap.add_argument("--limit", type=int, default=None)
@@ -144,8 +151,16 @@ def main() -> None:
 
         scorer = default_scorer(device=device)
 
+    arnet: dict[str, ARNetModel] = {}
+
     def make(arm: str):
         if arm in ("frameexit", "fe-uniform-10"):
+            return None
+        if arm in ("arnet-ada", "arnet-sc"):
+            mode = "ada" if arm == "arnet-ada" else "scsampler"
+            ck = args.arnet_ada_checkpoint if mode == "ada" else args.arnet_sc_checkpoint
+            arnet[arm] = ARNetModel(mode, checkpoint=ck, device=device, policy_px=args.arnet_sc_policy_px if mode == "scsampler" else None)
+            arnet[arm].labels = ds.classes
             return None
         kind, val = arm.rsplit("-", 1)
         if kind == "uniform":
@@ -182,7 +197,17 @@ def main() -> None:
                 if isinstance(sampler, OracleSampler):
                     sampler.uv = uv
                 try:
-                    if sampler is None:
+                    if arm in arnet:
+                        m = arnet[arm]
+                        with p.span("select"):
+                            idx = arnet_val_indices(v.num_frames, m.num_segments)
+                        with p.span("decode"):
+                            batch = v.read(idx)
+                        with p.span("infer"):
+                            logits = m(batch).logits
+                        k_used, extra = m.last_frames_used, m.last_gmacs - GMACS_PER_FRAME * m.last_frames_used
+                        n_scored_all.append(len(idx))
+                    elif sampler is None:
                         with p.span("select"):
                             idx = frameexit_indices(v, 10, fps_extract)
                         with p.span("decode"):
