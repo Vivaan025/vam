@@ -82,7 +82,12 @@ class MiniKinetics:
     def __init__(self, root: str | Path, split: str = "val", require_video: bool = True):
         self.root = Path(root)
         self.split = split
-        self.classes = [ln.split(maxsplit=1)[1].strip() for ln in open(self.root / "minik_classInd.txt") if ln.strip()]
+        # AdaFuse / AR-Net list: one class name per line (an optional leading index is dropped)
+        self.classes = []
+        for ln in open(self.root / "minik_classInd.txt"):
+            parts = ln.strip().split(maxsplit=1)
+            if parts:
+                self.classes.append(parts[1] if len(parts) == 2 and parts[0].isdigit() else ln.strip())
         self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
         files = _index_videos(self.root / f"minik_{split}")
         by_yt = {stem[:11]: p for stem, p in files.items()}

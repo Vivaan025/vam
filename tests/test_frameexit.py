@@ -83,9 +83,11 @@ def test_activitynet_and_minik_datasets(tmp_path):
 
     mk = tmp_path / "minik"
     (mk / "minik_val").mkdir(parents=True)
-    (mk / "minik_classInd.txt").write_text("0 abseiling\n1 zumba\n")
+    (mk / "minik_classInd.txt").write_text("abseiling\nzumba\n")
     (mk / "mini_kinetics_val.txt").write_text("7LSJ2Ryv1a8 299 0\nDcwyDVypfYg 299 1\n")
     (mk / "minik_val" / "7LSJ2Ryv1a8_000299_000309.mp4").write_bytes(b"")
     m = MiniKinetics(mk)
     assert len(m) == 1 and m.missing == ["DcwyDVypfYg"] and m.labels(m[0]) == [0]
     assert m[0].segments[0].class_name == "abseiling"
+    (mk / "minik_classInd.txt").write_text("0 abseiling\n1 zumba\n")
+    assert MiniKinetics(mk).classes == ["abseiling", "zumba"]

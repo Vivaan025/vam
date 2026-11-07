@@ -94,6 +94,7 @@ def main() -> None:
                                                   "keyframe-4", "keyframe-6", "keyframe-8"])
     ap.add_argument("--scorer-head", default=None, help="LearnedScorer weights; default = packaged THUMOS scorer")
     ap.add_argument("--no-refine", action="store_true")
+    ap.add_argument("--resize-first", type=int, default=0, help="resize the short side to this before the 224 resize (FrameExit extracted JPEGs at 350 / 256)")
     ap.add_argument("--device", default=None)
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default=None)
@@ -111,6 +112,23 @@ def main() -> None:
         ds.videos = ds.videos[: args.limit]
     model = FrameExitModel(args.dataset, checkpoint=args.checkpoint, device=device)
     model.labels = ds.classes
+    if args.resize_first:
+        import torch.nn.functional as F
+
+        inner, short = model.pre, int(args.resize_first)
+
+        class _TwoStep:
+            """FrameExit extracted JPEGs with the short side at 350 (ActivityNet) / 256 (Mini-K), then resized to 224."""
+
+            def __call__(self, frames):
+                x = torch.as_tensor(np.asarray(frames)) if not torch.is_tensor(frames) else frames
+                x = x.to(device).permute(0, 3, 1, 2).float()
+                h, w = x.shape[-2:]
+                sc = short / min(h, w)
+                x = F.interpolate(x, size=(int(round(h * sc)), int(round(w * sc))), mode="bilinear", align_corners=False, antialias=True)
+                return inner(x.permute(0, 2, 3, 1))
+
+        model.pre = _TwoStep()
     print(gpu, "|", ds, "| checkpoint", getattr(model, "checkpoint", None), flush=True)
 
     scorer = None
