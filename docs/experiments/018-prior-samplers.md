@@ -66,7 +66,20 @@ mAP on ActivityNet-1.3 val (multi-label), GFLOPs per video, measured ms per vide
   (tested against a verbatim copy). The 10to5 checkpoint has a different policy and the same head.
 - `benchmarks/eval_activitynet.py --arms ocsampler-6 ocsampler-5` (`--ocsampler-checkpoint`); GMACs = 4.12 x K
   + the policy's measured MACs (FlopCounterMode, ~1 GMAC for 10 frames at 128 px).
-- Still to run: ActivityNet val 10to6 / 10to5 against the published 76.9 / 21.7 GFLOPs; Mini-K 10to4 / 10to5.
+- Published numbers to compare against (OCSampler paper, Table 1, ImageNet-pretrained ResNet-50 classifier from
+  FrameExit, T = 10 candidates): ActivityNet 10to6 **77.2 mAP / 25.8 GFLOPs**, 10to5 76.9 / 21.7; Mini-Kinetics
+  10to5 **73.7 top-1 / 21.6**, 10to4 72.9 / 17.5. Same table: FrameExit 76.1 / 26.1 and 72.8 / 19.7, AR-Net 73.8 /
+  33.5 and 71.7 / 32.0, SCSampler 72.9 / 42.0 and 70.8 / 41.9, VideoIQ 74.8 / 28.1 and 72.3 / 20.4, AdaFocus 75.0 /
+  26.6 and 72.9 / 38.6, LiteEval 72.7 / 95.1 and 61.0 / 99.0. Their sampler cost is 25.8 - 24.7 = 1.1 GFLOPs,
+  which matches the 1.0 GMACs we count for 10 frames at 128 px.
+- **The paper's uniform baseline is not the one `vam` reports.** Table 4 of the paper gives uniform 72.6 / 73.8
+  mAP at N = 4 / 6 and random 71.2 / 73.8, all through the *10-frame* head (`cls_head.fc` = FrameExit
+  `classifiers.9`), whereas FrameExit trained one head per frame count. Our 017 uniform-4 / uniform-6 with the
+  matching heads are 72.1 / 75.2. So 1.4 of OCSampler's 3.4-point margin over "uniform" at 6 frames is the head,
+  not the policy. The 018 table reports both uniform rows (matching head, and 10-frame head) so this is visible.
+- First 200 val videos (`results/activitynet_018_smoke.jsonl`): ocsampler-6 0.848 mAP at 25.7 GMACs, 167 ms p50;
+  uniform-6 (6-frame head) 0.853 at 24.7 GMACs, 96 ms. Full val running (`results/logs/queue018.sh`).
+- Still to run: ActivityNet val 10to6 / 10to5; Mini-K 10to4 / 10to5; uniform-K through the 10-frame head.
 
 ## Decision
 pending
