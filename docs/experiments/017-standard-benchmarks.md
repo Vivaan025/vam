@@ -118,7 +118,11 @@ The FrameExit checkpoint loads and runs through `vam`'s decode. On this subset:
 - **H1: 0.755 mAP at 6.00 frames (24.7 GMACs) against the published 0.7612 at 24.7**, a gap of 0.6, just
   outside the 0.5 criterion. The frame count matches exactly, so the exit policy reproduces; the residual is
   the decode path (we resize the original frame straight to 224; FrameExit went through a 350-short-side JPEG
-  at quality 2). The 350 intermediate step is being run (`--resize-first 350`).
+  at quality 2). **The 350 intermediate step does not close it**: `--resize-first 350` gives 0.7531 at 6.03
+  frames (fe-uniform-10 0.768, uniform-4 0.719), i.e. unchanged within noise. The remaining 0.6 is the JPEG
+  encode (`ffmpeg -q:v 2`) and frame-position rounding of FrameExit's extraction, which we do not reproduce
+  because `vam` reads the container directly. H1 is recorded as a near miss on both sets (0.6 / 0.7 short,
+  compute exact) and the published number is quoted beside ours in every table.
 - **Oracle gap on the full val: +2.9 / +2.0 / +1.6 / +1.5 mAP at 4 / 6 / 8 / 10 frames** (THUMOS14: +17 at
   4). Larger than on the easier 339-video subset but still the Charades regime: every frame-selection method
   on this benchmark, published or ours, is working inside a 3-point window.
