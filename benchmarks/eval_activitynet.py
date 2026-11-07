@@ -4,6 +4,7 @@ Arms (``--arms``):
   frameexit      FrameExit's own 10-frame order and early exit (H1: reproduces 0.7612 mAP / 0.7331 top-1)
   fe-uniform-10  the same 10 frames, no exit, head for 10 frames (FrameExit's upper bound)
   uniform-K      vam UniformSampler(K) -> head for K frames
+  uniformh10-K   the same through the 10-frame head (OCSampler's "uniform" baseline, its Table 4)
   keyframe-K     vam KeyframeSampler(K) with the packaged scorer (or --scorer-head), refinement as in 007
   kfnr-K         the same without refinement (scores keyframes only)
   oracle-K       uniform inside the annotated segments (ground truth; the ceiling for any selector)
@@ -163,7 +164,7 @@ def main() -> None:
             arnet[arm].labels = ds.classes
             return None
         kind, val = arm.rsplit("-", 1)
-        if kind == "uniform":
+        if kind in ("uniform", "uniformh10"):
             return UniformSampler(int(val))
         if kind == "keyframe":
             k = int(val)
@@ -184,7 +185,7 @@ def main() -> None:
     with out.open("a") as f:
         for arm in args.arms:
             sampler = make(arm)
-            model.fixed_head = 10 if isinstance(sampler, OCSampler) else None
+            model.fixed_head = 10 if (isinstance(sampler, OCSampler) or arm.startswith("uniformh10")) else None
             scores, ys, ms_tot, gmacs, used, n_fb, n_scored_all = [], [], [], [], [], 0, []
             t_start = time.time()
             for uv in ds:
