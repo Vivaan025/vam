@@ -89,6 +89,24 @@ def test_ocsampler_selects_from_candidates_and_caches(h264_video):
     assert not torch.allclose(a, fe.logits_from_features(feats))
 
 
+def test_ocsampler_short_video_repeats_frames(synthetic_video):
+    pytest.importorskip("torchvision")
+    from vam.models.frameexit import FrameExitModel
+
+    torch.manual_seed(0)
+    fe = FrameExitModel("activitynet", device="cpu", imagenet_init=False, fixed_head=10)
+    s = OCSampler(6, preprocessor=fe.pre, device="cpu", candidates=10)
+    path, n, fps = synthetic_video
+    v = vam.load_video(path)
+    try:
+        v.num_frames = 7  # pretend the clip is shorter than the candidate count: mmaction wraps modulo n
+        idx = s.select(v)
+        assert len(s.last_candidates) == 10 and len(idx) <= 6 and idx == sorted(set(idx))
+        assert s.read(v, idx).indices.tolist() == idx
+    finally:
+        v.close()
+
+
 def test_arnet_val_indices_match_reference():
     for n in (5, 16, 17, 100, 3153):
         if n > 16:

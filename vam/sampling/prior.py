@@ -187,17 +187,21 @@ class OCSampler(Sampler):
 
     def select(self, video: Video) -> list[int]:
         cand = uniform_sample_frames(video.num_frames, self.candidates, self.seed)
-        order = sorted(range(len(cand)), key=lambda i: cand[i])
-        batch = video.read([cand[i] for i in order])  # decoders want ascending indices
-        inv = {cand[i]: p for p, i in enumerate(order)}
-        batch = FrameBatch(batch.frames[[inv[c] for c in cand]], batch.timestamps[[inv[c] for c in cand]],
-                           batch.indices[[inv[c] for c in cand]])
-        probs = self.scores(batch)
+        batch = video.read(sorted(set(cand)))  # decoders want ascending, unique indices
+        got = batch.indices.tolist()
+        pos = {g: i for i, g in enumerate(got)}
+        # the policy sees the candidates in their own order; a candidate the decoder could not return
+        # (short or damaged video) is stood in for by the nearest decoded frame, as mmaction's modulo wrap does
+        order = [pos.get(c, pos[min(got, key=lambda g: abs(g - c))]) for c in cand]
+        cbatch = FrameBatch(batch.frames[order], batch.timestamps[order], batch.indices[order])
+        probs = self.scores(cbatch)
         k = min(self.num_frames, len(cand))
         top = torch.topk(probs, k).indices.sort().values.tolist()
         self.last_probs, self.last_candidates = probs, cand
-        self._cache = FrameBatch(batch.frames[top], batch.timestamps[top], batch.indices[top])
-        return [cand[i] for i in top]
+        chosen = sorted({int(cbatch.indices[i]) for i in top})
+        keep = [pos[c] for c in chosen]
+        self._cache = FrameBatch(batch.frames[keep], batch.timestamps[keep], batch.indices[keep])
+        return chosen
 
     def read(self, video: Video, indices: list[int]) -> FrameBatch:
         c = self._cache
