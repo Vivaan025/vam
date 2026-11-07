@@ -104,7 +104,28 @@ The FrameExit checkpoint loads and runs through `vam`'s decode. On this subset:
   entry for `vam` there is the scheduler's uniform fallback (013), which should choose uniform on this
   footage; the accuracy contribution of keyframe selection is a long-video, low-coverage result (THUMOS14
   shape) and is reported as such. H2 is expected to fail on ActivityNet and H4 to hold on Mini-Kinetics.
-- Still to run: full val (queued), H3 (ActivityNet-trained head: can it recover the 1.4 points at 4 frames
+### Full val, 2026-11-07: 4,926 of 4,926 val videos present (one undecodable in the mirror), RTX 5090
+| arm | mAP | hit@1 | frames | GMACs | p50 / p90 ms | fallback |
+|---|---|---|---|---|---|---|
+| frameexit (its early exit) | **0.755** | 0.707 | 6.00 | 24.7 | 137 / 329 | – |
+| fe-uniform-10 (its frames, no exit) | 0.771 | 0.717 | 10 | 41.2 | 136 / 320 | – |
+| uniform-4 / 6 / 8 / 10 | 0.721 / 0.752 / 0.768 / 0.779 | 0.673 / 0.697 / 0.715 / 0.721 | 4–10 | 16.5–41.2 | 64 / 92 / 117 / 146 | – |
+| oracle-4 / 6 / 8 / 10 | 0.750 / 0.772 / 0.784 / 0.793 | 0.694 / 0.721 / 0.725 / 0.742 | 4–10 | 16.5–41.2 | 63 / 88 / 109 / 133 | – |
+| keyframe-4 / 6 / 8 (THUMOS scorer, refine) | 0.616 / 0.663 / 0.693 | 0.570 / 0.616 / 0.644 | 3.9–7.6 | 338 / 429 / 522 | 140 / 151 / 161 | 233 / 420 / 610 |
+| kfnr-4 / 6 / 8 (no refinement) | 0.624 / 0.671 / 0.699 | 0.578 / 0.620 / 0.647 | 3.9–7.7 | 168 / 176 / 183 | 96 / 108 / 119 | 233 / 420 / 610 |
+| budget-100 / 150 / 200 | 0.676 / 0.723 / 0.739 | 0.628 / 0.672 / 0.687 | 6.3 / 11.1 / 14.6 | 177 / 197 / 271 | 113 / 130 / 151 | 1026 |
+
+- **H1: 0.755 mAP at 6.00 frames (24.7 GMACs) against the published 0.7612 at 24.7**, a gap of 0.6, just
+  outside the 0.5 criterion. The frame count matches exactly, so the exit policy reproduces; the residual is
+  the decode path (we resize the original frame straight to 224; FrameExit went through a 350-short-side JPEG
+  at quality 2). The 350 intermediate step is being run (`--resize-first 350`).
+- **Oracle gap on the full val: +2.9 / +2.0 / +1.6 / +1.5 mAP at 4 / 6 / 8 / 10 frames** (THUMOS14: +17 at
+  4). Larger than on the easier 339-video subset but still the Charades regime: every frame-selection method
+  on this benchmark, published or ours, is working inside a 3-point window.
+- **H2 fails.** The THUMOS-trained scorer loses 10 points to uniform at 4 frames, falls back on 233–610
+  videos, and the budget sampler never beats uniform at matched milliseconds. The scan costs 34 CLIP images
+  per video (73–111 with refinement), which the ResNet-50 budget cannot absorb.
+- Still to run: H3 (ActivityNet-trained head: can it recover the 1.4 points at 4 frames
   at a scan cost that fits?), and one clip-level backbone (VideoMAE probe) on ActivityNet to separate
   "coverage" from "per-frame classifier" as the cause of the flat ceiling.
 
