@@ -66,9 +66,12 @@ class _Gate(nn.Module):
 class FrameExitModel(VideoActionModel):
     def __init__(self, dataset: str = "activitynet", checkpoint: str | os.PathLike | None = None,
                  device: str | None = None, dtype: torch.dtype = torch.float16, num_frames: int = 10,
-                 num_classes: int = 200, imagenet_init: bool = True):
+                 num_classes: int = 200, imagenet_init: bool = True, fixed_head: int | None = None):
         super().__init__()
         import torchvision
+
+        # OCSampler classifies its K chosen frames with the 10-frame head regardless of K
+        self.fixed_head = fixed_head
 
         dev = device or ("cuda" if torch.cuda.is_available() else "cpu")
         if dev == "cpu":
@@ -132,7 +135,7 @@ class FrameExitModel(VideoActionModel):
         """Pool T frame features by max and classify with the head trained for T frames (capped at 10)."""
         t = int(feats.shape[0])
         z = feats.max(dim=0).values
-        head = self.classifiers[min(t, self.default_num_frames) - 1]
+        head = self.classifiers[(self.fixed_head or min(t, self.default_num_frames)) - 1]
         return head(z.to(head.weight.dtype)).float()
 
     @torch.inference_mode()

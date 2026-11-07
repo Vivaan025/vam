@@ -56,7 +56,17 @@ mAP on ActivityNet-1.3 val (multi-label), GFLOPs per video, measured ms per vide
 - Google Drive weights may be rate-limited; `gdown` from the server, otherwise Vivaan downloads them.
 
 ## Results
-pending
+### 2026-11-07: OCSampler ported (`vam/sampling/prior.py`), not yet run
+- The released `anet_10to6_checkpoint.pth` carries FrameExit's weights verbatim: its `backbone.model.*` equals
+  FrameExit's ResNet-50 tensor for tensor, `cls_head.layers` is FrameExit's MLP and `cls_head.fc` is FrameExit's
+  10-frame head (`classifiers.9`). So OCSampler = `FrameExitModel(fixed_head=10)` + a MobileNetV2-TSM policy over
+  10 uniform frames at 128 px (nearest resize of the 224 crop), top-K kept in temporal order. The policy
+  (`sampler.*` keys, `.net.` on the shifted expand convs, shift_div 10 ActivityNet / 8 Mini-K) loads with
+  `weights_only=True`. Candidate positions reproduce mmaction's `UniformSampleFrames(test_mode, seed 255)`
+  (tested against a verbatim copy). The 10to5 checkpoint has a different policy and the same head.
+- `benchmarks/eval_activitynet.py --arms ocsampler-6 ocsampler-5` (`--ocsampler-checkpoint`); GMACs = 4.12 x K
+  + the policy's measured MACs (FlopCounterMode, ~1 GMAC for 10 frames at 128 px).
+- Still to run: ActivityNet val 10to6 / 10to5 against the published 76.9 / 21.7 GFLOPs; Mini-K 10to4 / 10to5.
 
 ## Decision
 pending

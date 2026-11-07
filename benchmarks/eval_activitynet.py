@@ -8,6 +8,8 @@ Arms (``--arms``):
   kfnr-K         the same without refinement (scores keyframes only)
   oracle-K       uniform inside the annotated segments (ground truth; the ceiling for any selector)
   budget-B       vam BudgetedSampler(B ms), cost model calibrated on this machine
+  ocsampler-K    OCSampler as released (018): MobileNetV2-TSM policy over 10 frames at 128 px, top-K, 10-frame head
+                 (--ocsampler-checkpoint, default $VAM_OCSAMPLER_CHECKPOINT)
 
 GMACs follow FrameExit's accounting (4.12 per ResNet-50 frame) plus 4.4 per CLIP ViT-B/32 image the sampler
 scores (keyframes and refinement candidates). Measured milliseconds are select / decode / infer per video.
@@ -31,7 +33,7 @@ import vam
 from vam.core import FrameBatch
 from vam.data import ActivityNet, MiniKinetics
 from vam.models.frameexit import GMACS_PER_FRAME, FrameExitModel
-from vam.sampling import KeyframeSampler, Sampler, UniformSampler
+from vam.sampling import KeyframeSampler, OCSampler, Sampler, UniformSampler
 
 CLIP_GMACS = 4.4  # ViT-B/32 image tower at 224, same FLOPs-as-MACs convention FrameExit uses for ResNet-50
 
@@ -94,6 +96,7 @@ def main() -> None:
                                                   "keyframe-4", "keyframe-6", "keyframe-8"])
     ap.add_argument("--scorer-head", default=None, help="LearnedScorer weights; default = packaged THUMOS scorer")
     ap.add_argument("--no-refine", action="store_true")
+    ap.add_argument("--ocsampler-checkpoint", default=None)
     ap.add_argument("--resize-first", type=int, default=0, help="resize the short side to this before the 224 resize (FrameExit extracted JPEGs at 350 / 256)")
     ap.add_argument("--device", default=None)
     ap.add_argument("--limit", type=int, default=None)
@@ -156,6 +159,8 @@ def main() -> None:
             return OracleSampler(int(val))
         if kind == "budget":
             return vam.BudgetedSampler(float(val), model, calibrate_on=[uv.path for uv in ds.videos[:3]], scorer=scorer)
+        if kind == "ocsampler":
+            return OCSampler(int(val), checkpoint=args.ocsampler_checkpoint, preprocessor=model.pre, device=device)
         raise ValueError(arm)
 
     out = Path(args.out or f"results/{args.dataset}_017.jsonl")
@@ -164,6 +169,7 @@ def main() -> None:
     with out.open("a") as f:
         for arm in args.arms:
             sampler = make(arm)
+            model.fixed_head = 10 if isinstance(sampler, OCSampler) else None
             scores, ys, ms_tot, gmacs, used, n_fb, n_scored_all = [], [], [], [], [], 0, []
             t_start = time.time()
             for uv in ds:
@@ -201,6 +207,8 @@ def main() -> None:
                         fine = getattr(ks, "last_fine", None) if isinstance(ks, KeyframeSampler) else None
                         n_scored += len(fine[0]) if fine and fine[0] is not None else 0
                         extra = CLIP_GMACS * n_scored
+                        if isinstance(sampler, OCSampler):
+                            n_scored, extra = sampler.candidates, sampler.gmacs
                         n_scored_all.append(n_scored)
                         n_fb += getattr(ks, "last_fallback", None) is not None
                     if device == "cuda":
