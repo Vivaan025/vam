@@ -153,10 +153,27 @@ The FrameExit checkpoint loads and runs through `vam`'s decode. On this subset:
 - FrameExit's own exit beats uniform at its frame count on both sets (Mini-K: 0.7265 at 4.77 frames vs
   uniform-4 0.706 / uniform-6 0.723), which is the published claim and the reason an exit policy is the right
   comparison for compute, not for action finding.
-- Still to run: H3 (ActivityNet-trained head: can it recover the 1.4 points at 4 frames
-  at a scan cost that fits?), and one clip-level backbone (VideoMAE probe) on ActivityNet to separate
-  "coverage" from "per-frame classifier" as the cause of the flat ceiling.
+### H3, 2026-11-07: scorer retrained on the 1,312-video ActivityNet train subset (`scorer_anet_context_nozs.pt`)
+| arm | mAP (THUMOS scorer → ActivityNet scorer) | GMACs | p50 ms | fallback |
+|---|---|---|---|---|
+| keyframe-4 / 6 / 8 | 0.616 → **0.672** / 0.663 → 0.703 / 0.693 → 0.721 | 344 / 439 / 532 | 143 / 178 / 204 | 242 / 433 / 619 |
+| kfnr-4 / 6 / 8 | 0.624 → 0.674 / 0.671 → 0.699 / 0.699 → 0.718 | 168 / 175 / 183 | 127 / 137 / 129 | 242 / 433 / 619 |
+| budget-100 / 150 | 0.676 → 0.717 / 0.723 → **0.753** (6.3 / 11.1 frames) | 178 / 197 | 120 / 143 | 1037 |
 
+- Retraining recovers 5.6 of the 10.5 points at 4 frames and the budget sampler reaches the uniform line at
+  150 ms (0.753 at 11.1 frames; uniform-10 0.779 at 146 ms). It still loses 4.9 to uniform-4 at matched frames,
+  costs 34 CLIP images per video and falls back on 5–12 % of videos. H3 is a partial recovery, not a pass.
+- Not run: the VideoMAE probe (optional). The 018 table makes it unnecessary for the decision below: a learned
+  per-frame policy (OCSampler) does beat uniform by 2.2 on this classifier, so the ceiling is a property of
+  the benchmark's coverage, not of a per-frame classifier alone.
+
+Results pages: `docs/results/activitynet_017.md` (+ CSV).
 
 ## Decision
-pending
+**H1 near miss, H2 fails, H3 partial, H4 holds. The benchmark is in `vam` and the numbers are public.**
+FrameExit reproduces to 0.6 / 0.7 with compute exact; the residual is the JPEG extraction we do not reproduce
+and is quoted, not hidden. The keyframe sampler is the wrong tool on ActivityNet (coverage 0.72, oracle gap
++2.9): the library's honest entry there is the uniform fallback, and 018 shows what a learned policy can get
+(+2.2). What this changes in the library: the scheduler must estimate coverage and route high-coverage video to
+uniform *before* paying for a scan (next experiment), and the scan must get cheaper than 34 CLIP images.
+Status: done. FCVID stays blocked on the data request.

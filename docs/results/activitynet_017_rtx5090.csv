@@ -1,0 +1,41 @@
+file,arm,n,mAP,hit1,frames,gmacs,p50_ms,p90_ms,fallback,scored,scorer_head
+activitynet_017_full,frameexit,4925,0.7548,0.7074,6.0,24.7,137,329,0,0,
+activitynet_017_full,fe-uniform-10,4926,0.7711,0.7168,10.0,41.2,136,320,0,0,
+activitynet_017_full,uniform-4,4926,0.7211,0.6728,4.0,16.5,64,150,0,0,
+activitynet_017_full,uniform-6,4926,0.7523,0.6973,6.0,24.7,92,223,0,0,
+activitynet_017_full,uniform-8,4926,0.7682,0.7152,8.0,33.0,117,291,0,0,
+activitynet_017_full,uniform-10,4926,0.7785,0.7209,10.0,41.2,146,353,0,0,
+activitynet_017_full,oracle-4,4926,0.7501,0.6939,4.0,16.5,63,151,0,0,
+activitynet_017_full,oracle-6,4926,0.7719,0.7207,6.0,24.7,88,217,0,0,
+activitynet_017_full,oracle-8,4926,0.7843,0.7247,7.99,32.9,109,280,0,0,
+activitynet_017_full,oracle-10,4926,0.7933,0.7416,9.99,41.2,133,345,0,0,
+activitynet_017_full,keyframe-4,4926,0.6163,0.5696,3.89,337.5,140,396,233,73,thumos (packaged)
+activitynet_017_full,keyframe-6,4926,0.6631,0.6159,5.76,429.4,151,431,420,92,thumos (packaged)
+activitynet_017_full,keyframe-8,4926,0.6929,0.6437,7.62,521.5,161,471,610,111,thumos (packaged)
+activitynet_017_full,kfnr-4,4926,0.6244,0.5782,3.91,167.7,96,222,233,34,thumos (packaged)
+activitynet_017_full,kfnr-6,4926,0.671,0.6196,5.8,175.5,108,258,420,34,thumos (packaged)
+activitynet_017_full,kfnr-8,4926,0.6985,0.6474,7.7,183.3,119,301,610,34,thumos (packaged)
+activitynet_017_full,budget-100,4926,0.6755,0.6275,6.27,177.4,113,266,1026,34,thumos (packaged)
+activitynet_017_full,budget-150,4926,0.7225,0.6719,11.09,197.3,130,320,1026,34,thumos (packaged)
+activitynet_017_full,budget-200,4926,0.7392,0.6872,14.64,270.9,151,376,1026,48,thumos (packaged)
+activitynet_017_r350,frameexit,4925,0.7531,0.7042,6.03,24.8,138,325,0,0,
+activitynet_017_r350,fe-uniform-10,4926,0.768,0.714,10.0,41.2,137,326,0,0,
+activitynet_017_r350,uniform-4,4926,0.7187,0.6732,4.0,16.5,64,149,0,0,
+activitynet_017_anetscorer,keyframe-4,4926,0.6722,0.6291,3.9,344.0,143,405,242,75,activitynet-trained
+activitynet_017_anetscorer,keyframe-6,4926,0.7031,0.6614,5.76,438.5,178,481,433,94,activitynet-trained
+activitynet_017_anetscorer,keyframe-8,4926,0.7214,0.6754,7.62,532.0,204,571,619,114,activitynet-trained
+activitynet_017_anetscorer,kfnr-4,4926,0.6739,0.6295,3.89,167.6,127,291,242,34,activitynet-trained
+activitynet_017_anetscorer,kfnr-6,4926,0.6993,0.6514,5.78,175.4,137,337,433,34,activitynet-trained
+activitynet_017_anetscorer,kfnr-8,4926,0.7178,0.6703,7.67,183.2,129,343,619,34,activitynet-trained
+activitynet_017_anetscorer,budget-100,4926,0.7171,0.673,6.29,177.5,120,288,1037,34,activitynet-trained
+activitynet_017_anetscorer,budget-150,4926,0.7528,0.7002,11.1,197.3,143,363,1037,34,activitynet-trained
+minikinetics_017,frameexit,9858,0.78,0.7265,4.77,19.6,32,86,0,0,
+minikinetics_017,fe-uniform-10,9858,0.7959,0.7367,10.0,41.2,31,86,0,0,
+minikinetics_017,uniform-4,9858,0.7654,0.7062,4.0,16.5,46,126,0,0,
+minikinetics_017,uniform-6,9858,0.7809,0.7229,6.0,24.7,28,76,0,0,
+minikinetics_017,uniform-8,9858,0.7903,0.7335,8.0,33.0,29,80,0,0,
+minikinetics_017,uniform-10,9858,0.7956,0.7392,10.0,41.2,29,80,0,0,
+minikinetics_017,keyframe-4,9858,0.7507,0.6933,3.99,98.7,63,161,8190,19,thumos (packaged)
+minikinetics_017,keyframe-8,9858,0.772,0.7178,7.91,114.9,45,116,8190,19,thumos (packaged)
+minikinetics_017,kfnr-4,9858,0.751,0.6942,4.0,26.2,59,150,8190,2,thumos (packaged)
+minikinetics_017,kfnr-8,9858,0.7741,0.7198,7.99,42.6,43,104,8190,2,thumos (packaged)

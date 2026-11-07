@@ -72,11 +72,10 @@ mAP on ActivityNet-1.3 val (multi-label), GFLOPs per video, measured ms per vide
   33.5 and 71.7 / 32.0, SCSampler 72.9 / 42.0 and 70.8 / 41.9, VideoIQ 74.8 / 28.1 and 72.3 / 20.4, AdaFocus 75.0 /
   26.6 and 72.9 / 38.6, LiteEval 72.7 / 95.1 and 61.0 / 99.0. Their sampler cost is 25.8 - 24.7 = 1.1 GFLOPs,
   which matches the 1.0 GMACs we count for 10 frames at 128 px.
-- **The paper's uniform baseline is not the one `vam` reports.** Table 4 of the paper gives uniform 72.6 / 73.8
-  mAP at N = 4 / 6 and random 71.2 / 73.8, all through the *10-frame* head (`cls_head.fc` = FrameExit
-  `classifiers.9`), whereas FrameExit trained one head per frame count. Our 017 uniform-4 / uniform-6 with the
-  matching heads are 72.1 / 75.2. So 1.4 of OCSampler's 3.4-point margin over "uniform" at 6 frames is the head,
-  not the policy. The 018 table reports both uniform rows (matching head, and 10-frame head) so this is visible.
+- The paper's Table 4 gives uniform 72.6 / 73.8 mAP at N = 4 / 6 through the 10-frame head; our uniform through
+  the same head is 0.721 / 0.751 (`uniformh10-K`) and through the matched heads 0.721 / 0.752. So the head does
+  not explain the 1.4-point gap between their uniform-6 and ours (an earlier draft of this entry guessed it did);
+  their baseline's frames or decode do. OCSampler's margin over uniform on our decode is 2.2, not 3.4.
 - First 200 val videos (`results/activitynet_018_smoke.jsonl`): ocsampler-6 0.848 mAP at 25.7 GMACs, 167 ms p50;
   uniform-6 (6-frame head) 0.853 at 24.7 GMACs, 96 ms. Full val running (`results/logs/queue018.sh`).
 - Still to run: ActivityNet val 10to6 / 10to5; Mini-K 10to4 / 10to5; uniform-K through the 10-frame head.
@@ -95,7 +94,40 @@ mAP on ActivityNet-1.3 val (multi-label), GFLOPs per video, measured ms per vide
   ResNet-18 @ 112, policy head, skip 1 / 2 / 4); chosen logits averaged. The released test samples the action
   with Gumbel noise at tau = 1e-6; we take the arg max (deterministic limit) and say so. Per-option MACs are
   measured with `FlopCounterMode` at init (ResNet-50 @ 224 = 4.1, matching the 4.12 convention of 017).
-- Still to run: ActivityNet val `arnet-ada`, `arnet-sc` (224 and 84) against published 73.8 / 33.5 and 72.9 / 42.0.
+### Full results, 2026-11-07 (`docs/results/activitynet_018.md` + CSV)
+| method (ActivityNet val) | classifier | mAP | frames | GMACs | p50 ms | published |
+|---|---|---|---|---|---|---|
+| uniform-6, matched head / 10-frame head | FrameExit | 0.752 / 0.751 | 6 | 24.7 | 92 / 128 | – / 73.8 |
+| FrameExit exit | FrameExit | 0.755 | 6.00 | 24.7 | 137 | 76.1 / 26.1 |
+| OCSampler 10→5 / 10→6 | FrameExit | 0.766 / **0.774** | 5 / 6 | 21.6 / 25.7 | 207 / 184 | 76.9 / 21.7, 77.2 / 25.8 |
+| AR-Net adaptive | own TSN | 0.738 | 13.5 | 36.4 | 316 | 73.8 / 33.5 |
+| SCSampler (AR-Net), policy 224 / 84 px | own TSN | 0.737 / 0.724 | 10 | 45.7 / 41.7 | 246 / 236 | 72.9 / 42.0 |
+| vam keyframe-6, ActivityNet scorer | FrameExit | 0.703 | 5.8 | 439 | 178 | – |
+| vam budget-150 | FrameExit | 0.753 | 11.1 | 197 | 143 | – |
+
+Mini-Kinetics: OCSampler 10→4 / 10→5 0.718 / 0.722 top-1 (published 72.9 / 73.7) at 17.5 / 21.6 GMACs; FrameExit
+0.7265 at 19.6; uniform-4 / 6 0.706 / 0.723.
+
+- **H1 (published numbers reproduce):** OCSampler within 0.3 on ActivityNet and 1.5 on Mini-K, AR-Net within 0.1,
+  FrameExit within 0.6, SCSampler at 224 px 0.8 *above* its paper and at 84 px 0.5 below; compute matches the
+  published GFLOPs where the released configuration is unambiguous. Pass.
+- **H2 (vam within 1 mAP of OCSampler 10→6 at its cost):** fails. keyframe-6 is 7 points below at 17x the GMACs;
+  budget-150 is 2.1 below at 8x. The ActivityNet-trained scorer (017 H3) does not change this.
+- **H3 (measured ms orders methods differently from GFLOPs):** holds. Uniform-6 92 ms, OCSampler 184 ms (10
+  candidate decodes + policy before the first classifier frame), AR-Net 316 ms (16 decodes + per-frame LSTM),
+  SCSampler 246 ms; vam budget-150 143 ms. On GFLOPs OCSampler is the cheapest adaptive method; on wall time it
+  is 2x uniform and only vam's budget sampler sits between the two.
+- **H4 (a reviewer's "at least two prior samplers under the same backbone and budget"):** met for OCSampler and
+  FrameExit (same classifier, same decode, same machine); AR-Net / SCSampler share data and machine but keep
+  their own classifier, as in the published tables. AdaFrame and SMART were not re-implemented; VideoIQ is
+  quoted from the literature only.
 
 ## Decision
-pending
+**Done at the "as released" level; `vam`'s keyframe sampler is not a competitor on ActivityNet and is not
+presented as one.** The table that goes into any write-up is `docs/results/activitynet_018.md`: three prior
+methods reproduced from their weights on one machine, with published numbers beside ours, measured milliseconds
+as a second axis, and `vam` entering as the budget sampler on the uniform line. The honest claim for the library
+is unchanged from 012 / 017: on low-coverage long video the keyframe runtime is +17 at 4 frames and ~150 ms at
+any budget; on high-coverage benchmarks the right answer is uniform (or OCSampler's policy, which is now one
+`Sampler` in `vam`), and the scheduler must decide that from the footage. Next: coverage estimation in the
+scheduler, then a cheaper scan; AdaFrame / SMART only if a reviewer asks.

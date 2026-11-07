@@ -26,7 +26,10 @@ trained ResNet-50, against each other. These two items put `vam` in that table.
 
 | # | item | why | estimate | target |
 |---|---|---|---|---|
-| R8 | Standard benchmarks (017): ActivityNet-1.3 val and Mini-Kinetics under the FrameExit protocol (1 fps, ResNet-50, mAP / top-1, GFLOPs), FrameExit checkpoint reproduced first; FCVID once the data request is granted | the benchmark the field recognises | 1-2 weeks (data-bound) | 2026-11-21 |
-| R9 | Prior samplers (018): FrameExit, OCSampler, AR-Net from released weights; SCSampler, AdaFrame, SMART re-implemented; one table of mAP x GFLOPs x measured ms on the same machine and classifier | "how does it do against at least two of them under the same backbone and budget" | 2-3 weeks | 2026-12-12 |
+| R8 | Standard benchmarks (017): ActivityNet-1.3 val and Mini-Kinetics under the FrameExit protocol (1 fps, ResNet-50, mAP / top-1, GFLOPs), FrameExit checkpoint reproduced first; FCVID once the data request is granted | the benchmark the field recognises | 1-2 weeks (data-bound) | **done 2026-11-07** (FCVID blocked) |
+| R9 | Prior samplers (018): FrameExit, OCSampler, AR-Net from released weights; SCSampler, AdaFrame, SMART re-implemented; one table of mAP x GFLOPs x measured ms on the same machine and classifier | "how does it do against at least two of them under the same backbone and budget" | 2-3 weeks | **done 2026-11-07** at the as-released level (OCSampler, AR-Net, SCSampler; AdaFrame / SMART not re-implemented) |
+
+| R10 | Coverage-aware scheduler: estimate action coverage from the keyframe scan and route high-coverage footage to uniform before paying for CLIP scoring; cheaper scan (< 10 images) | 017 / 018: on ActivityNet the budget sampler only reaches the uniform line and the scan costs 34 images | 1-2 weeks | 2026-11-28 |
+| R11 | A second public low-coverage long-video benchmark (MultiTHUMOS, HACS segments or FineAction) so THUMOS14 is not the only evidence for the +17 | one dataset is an anecdote | 2 weeks (data-bound) | 2026-12-12 |
 
 Progress is tracked in [`CHANGELOG.md`](CHANGELOG.md) and [`experiments/README.md`](experiments/README.md).

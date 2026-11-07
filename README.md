@@ -104,6 +104,8 @@ the recorded ones on BridgeData (Δxyz correlation 0.97) and the scheduler's cos
 - [x] Generality within domain: held-out split, 1080p, HEVC, VP9, keyframe density (`docs/results/thumos14_generality.md`)
 - [x] Second domain: Charades, a negative result that states the method's boundary (`docs/results/charades.md`)
 - [x] Robustness: documented errors, no hangs, degenerate inputs answer uniform, scheduler fallback (`docs/results/robustness.md`)
+- [x] Standard benchmarks: ActivityNet-1.3 and Mini-Kinetics under the FrameExit protocol, FrameExit reproduced from its weights (`docs/results/activitynet_017.md`)
+- [x] Prior samplers on one machine: OCSampler, AR-Net, SCSampler ported from released weights and reproduced; `OCSampler` is a `vam` sampler (`docs/results/activitynet_018.md`)
 - [x] Packaging: `vam-runtime` wheel with the packaged scorer, bounded dependency ranges, CI on Linux + Windows (015)
 - [x] Docs: quickstart, API reference, `BudgetedSampler`, executable snippets (016)
 - [ ] GPU windowed decode (NVDEC) — deferred past v0.1
