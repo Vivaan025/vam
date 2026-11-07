@@ -14,8 +14,8 @@ all with an end-to-end trained ResNet-50 (or MobileNet / EfficientNet) classifie
 ## Datasets and sources
 | set | protocol in the literature | source available to us | size | status |
 |---|---|---|---|---|
-| ActivityNet-1.3 val (4,926 videos, 200 classes, untrimmed) | 1 fps frames, short side 350, 10 frames, ResNet-50 (FrameExit protocol); mAP | Hugging Face mirrors: `YimuWang/ActivityNet` (full resolution, 577 GB) and `interlive/stream-data` (`videos/activitynet_part01..12.tar`, 115 GB, resolution to be checked) | server has 697 GB free | one shard being inspected |
-| Mini-Kinetics val (9,863 videos of the 200 AR-Net classes) | 5 fps frames, short side 256, ResNet-50; top-1 | Kinetics-400 val from CVDF (`s3.amazonaws.com/kinetics/400/val`, 20 shards, ~30 GB); class lists from the OCSampler repo (`data/mini_kinetics/*.txt`) | 30 GB | downloading |
+| ActivityNet-1.3 val (4,926 videos, 200 classes, untrimmed) | 1 fps frames, short side 350, 10 frames, ResNet-50 (FrameExit protocol); mAP | Hugging Face mirrors: `YimuWang/ActivityNet` (full resolution, 577 GB) and `interlive/stream-data` (`videos/activitynet_part01..12.tar`, 115 GB, resolution to be checked) | 159 GB (val + 1,312 train) | done: 4,926 / 4,926 val |
+| Mini-Kinetics val (9,863 videos of the 200 AR-Net classes) | 5 fps frames, short side 256, ResNet-50; top-1 | Kinetics-400 val from CVDF (`s3.amazonaws.com/kinetics/400/val`, 20 shards, ~30 GB); class lists from the OCSampler repo (`data/mini_kinetics/*.txt`) | 30 GB | done: 9,858 / 9,863 clips |
 | FCVID (91k videos, 239 classes) | ResNet-50; mAP | request-only from Fudan (`bigvid.fudan.edu.cn/FCVID`, agreement form by e-mail) | 4,232 h | **blocked: Vivaan must send the request** |
 | Kinetics-400 full | top-1 | CVDF, 685 GB | exceeds free disk | not planned |
 
@@ -125,6 +125,30 @@ The FrameExit checkpoint loads and runs through `vam`'s decode. On this subset:
 - **H2 fails.** The THUMOS-trained scorer loses 10 points to uniform at 4 frames, falls back on 233–610
   videos, and the budget sampler never beats uniform at matched milliseconds. The scan costs 34 CLIP images
   per video (73–111 with refinement), which the ResNet-50 budget cannot absorb.
+### Mini-Kinetics val, 2026-11-07: 9,858 of 9,863 clips (5 missing from the CVDF shards), `--resize-first 256`, RTX 5090
+| arm | top-1 (hit@1) | mAP | frames | GMACs | p50 / p90 ms | fallback |
+|---|---|---|---|---|---|---|
+| frameexit (its early exit, first threshold 0.95) | **0.7265** | 0.780 | 4.77 | 19.6 | 32 / 86 | – |
+| fe-uniform-10 | 0.737 | 0.796 | 10 | 41.2 | 31 / 86 | – |
+| uniform-4 / 6 / 8 / 10 | 0.706 / 0.723 / 0.734 / 0.739 | 0.765 / 0.781 / 0.790 / 0.796 | 4–10 | 16.5–41.2 | 46 / 28 / 29 / 29 | – |
+| keyframe-4 / 8 (THUMOS scorer, refine) | 0.693 / 0.718 | 0.751 / 0.772 | 4.0 / 7.9 | 98.7 / 114.9 | 63 / 45 | 8,190 / 8,190 |
+| kfnr-4 / 8 | 0.694 / 0.720 | 0.751 / 0.774 | 4.0 / 8.0 | 26.2 / 42.6 | 59 / 43 | 8,190 / 8,190 |
+
+- **H1 on Mini-Kinetics: 0.7265 top-1 at 4.77 frames (19.6 GMACs) against the published 0.7331 at 19.7.**
+  The compute matches to 0.1 GMACs, the accuracy is 0.66 below, the same residual as on ActivityNet, and the
+  256 intermediate resize did not remove it. What is left is the JPEG step itself (FrameExit's frames went
+  through `ffmpeg -q:v 2` JPEGs) and the exact frame positions in the 5 fps extraction; neither is the exit
+  policy. Both reproductions are inside 0.7 with the frame budget exact, which is enough to compare samplers
+  on the same classifier; the published numbers are quoted alongside ours in every table.
+- **H4 holds, in the expected direction and a little beyond.** On 10 s trimmed clips the short-video rule
+  sends 83 % of clips (8,190 of 9,858) to the uniform fallback, and the 17 % the scanner does handle end up
+  1.3–1.5 points *below* uniform: a scorer trained on THUMOS14 keyframes has nothing to find in a trimmed
+  clip, and its choice is worse than evenly spaced frames. Without refinement the scan costs 2 CLIP images
+  per clip (26.2 vs 16.5 GMACs at 4 frames), with refinement 19. The fallback is doing its job; the
+  threshold is not yet strict enough for this set.
+- FrameExit's own exit beats uniform at its frame count on both sets (Mini-K: 0.7265 at 4.77 frames vs
+  uniform-4 0.706 / uniform-6 0.723), which is the published claim and the reason an exit policy is the right
+  comparison for compute, not for action finding.
 - Still to run: H3 (ActivityNet-trained head: can it recover the 1.4 points at 4 frames
   at a scan cost that fits?), and one clip-level backbone (VideoMAE probe) on ActivityNet to separate
   "coverage" from "per-frame classifier" as the cause of the flat ceiling.
