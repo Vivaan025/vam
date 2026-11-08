@@ -104,6 +104,7 @@ def main() -> None:
     ap.add_argument("--clip-fp32", action="store_true", help="run the CLIP scorer in full precision (default fp16)")
     ap.add_argument("--scorer-head", default=None, help="checkpoint from scripts/train_scorer.py for the kf-learned sampler")
     ap.add_argument("--tag", default="", help="suffix appended to kf-* sampler names in the log, e.g. ':gap+softmax'")
+    ap.add_argument("--coverage-router", default=None, help="019: coverage estimator .npz ('default' = packaged); kf-* samplers route to uniform before scoring")
     ap.add_argument("--motion-stride", type=int, default=4, help="score every k-th frame for motion")
     ap.add_argument("--limit", type=int, default=None)
     ap.add_argument("--out", default="results/thumos14.jsonl")
@@ -135,6 +136,10 @@ def main() -> None:
 
     kf_opts = dict(window=args.kf_window, alloc=args.kf_alloc, temperature=args.kf_temp,
                    refine_stride=args.kf_refine_stride, decode_backend=args.decode_backend)
+    if args.coverage_router:
+        from vam.sampling import CoverageEstimator, default_estimator
+
+        kf_opts["coverage_estimator"] = default_estimator() if args.coverage_router == "default" else CoverageEstimator.load(args.coverage_router)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

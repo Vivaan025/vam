@@ -45,7 +45,8 @@ class KeyframeSampler(Sampler):
                  alloc: str = "equal", temperature: float = 0.2,
                  refine: "Optional[Scorer] | bool" = True, refine_stride: int = 6, keep_edge: int = 224,
                  decode_backend: str = "thread", decode_workers: int | None = None,
-                 planner=None, fallback: str = "uniform", flat_eps: float = 1e-3, max_coverage: float = 0.5):
+                 planner=None, fallback: str = "uniform", flat_eps: float = 1e-3, max_coverage: float = 0.5,
+                 coverage_estimator=None):
         super().__init__(num_frames)
         if scorer is None:  # 015: the packaged class-free learned scorer (CLIP ViT-B/32 + context head)
             from vam.sampling.learned import default_scorer
@@ -84,6 +85,14 @@ class KeyframeSampler(Sampler):
         # 013: if the chosen windows would cover more than this fraction of the video there is nothing to
         # select (Charades: 2-4 windows of 5 s on a 30 s clip); uniform frames are the better answer.
         self.max_coverage = max_coverage
+        # 019: predict action coverage from the scan (no scoring) and answer uniform when it exceeds
+        # max_coverage. None = off; "default" = the packaged estimator; or any object with .predict(kf) -> float.
+        if coverage_estimator == "default":
+            from vam.sampling.coverage import default_estimator
+
+            coverage_estimator = default_estimator()
+        self.coverage_estimator = coverage_estimator
+        self.last_predicted_coverage: float | None = None
         self.last_fallback: str | None = None
         self.last_keyframes: Optional[Keyframes] = None
         self.last_scores: Optional[np.ndarray] = None
@@ -160,6 +169,12 @@ class KeyframeSampler(Sampler):
             return self._fallback(video, "short-clip")
         kf = scan_keyframes(video.path, thumb=self.thumb, workers=self.scan_workers, stride=self.keyframe_stride,
                             backend=self.scan_backend)
+        self.last_predicted_coverage = None
+        if self.coverage_estimator is not None and self.fallback == "uniform":
+            self.last_predicted_coverage = float(self.coverage_estimator.predict(kf))
+            if self.last_predicted_coverage > self.max_coverage:
+                self.last_keyframes, self.last_scores = kf, None
+                return self._fallback(video, "predicted-coverage")
         scores = np.asarray(self.scorer(kf), dtype=np.float64)
         if scores.shape != (len(kf),):
             raise ValueError(f"scorer returned {scores.shape}, expected ({len(kf)},)")

@@ -101,6 +101,7 @@ def main() -> None:
                                                   "keyframe-4", "keyframe-6", "keyframe-8"])
     ap.add_argument("--scorer-head", default=None, help="LearnedScorer weights; default = packaged THUMOS scorer")
     ap.add_argument("--no-refine", action="store_true")
+    ap.add_argument("--coverage-router", default=None, help="019: coverage estimator .npz ('default' = packaged); keyframe/kfnr/budget arms route to uniform before scoring")
     ap.add_argument("--ocsampler-checkpoint", default=None)
     ap.add_argument("--arnet-ada-checkpoint", default=None)
     ap.add_argument("--arnet-sc-checkpoint", default=None)
@@ -154,6 +155,12 @@ def main() -> None:
 
     arnet: dict[str, ARNetModel] = {}
 
+    cov = None
+    if args.coverage_router:
+        from vam.sampling import CoverageEstimator, default_estimator
+
+        cov = default_estimator() if args.coverage_router == "default" else CoverageEstimator.load(args.coverage_router)
+
     def make(arm: str):
         if arm in ("frameexit", "fe-uniform-10"):
             return None
@@ -168,13 +175,13 @@ def main() -> None:
             return UniformSampler(int(val))
         if kind == "keyframe":
             k = int(val)
-            return KeyframeSampler(k, scorer, refine=None if args.no_refine else scorer)
+            return KeyframeSampler(k, scorer, refine=None if args.no_refine else scorer, coverage_estimator=cov)
         if kind == "kfnr":
-            return KeyframeSampler(int(val), scorer, refine=None)
+            return KeyframeSampler(int(val), scorer, refine=None, coverage_estimator=cov)
         if kind == "oracle":
             return OracleSampler(int(val))
         if kind == "budget":
-            return vam.BudgetedSampler(float(val), model, calibrate_on=[uv.path for uv in ds.videos[:3]], scorer=scorer)
+            return vam.BudgetedSampler(float(val), model, calibrate_on=[uv.path for uv in ds.videos[:3]], scorer=scorer, coverage_estimator=cov)
         if kind == "ocsampler":
             return OCSampler(int(val), checkpoint=args.ocsampler_checkpoint, preprocessor=model.pre, device=device)
         raise ValueError(arm)
@@ -259,7 +266,7 @@ def main() -> None:
                 plan = getattr(sampler, "last_plan", None)
                 f.write(json.dumps({
                     "ts": time.time(), "host": platform.node(), "gpu": gpu, "dataset": args.dataset, "split": ds.split,
-                    "arm": arm, "video": uv.video_id, "duration_s": duration, "fps": fps, "labels": ds.labels(uv),
+                    "arm": arm, "router": args.coverage_router, "video": uv.video_id, "duration_s": duration, "fps": fps, "labels": ds.labels(uv),
                     "pred": int(prob.argmax()), "hit1": bool(y[int(prob.argmax())] > 0), "frames_used": k_used,
                     "gmacs": g, "config": str(plan.config) if plan else None, "predicted_ms": plan.predicted_ms if plan else None,
                     "fallback": getattr(sampler.last if isinstance(sampler, vam.BudgetedSampler) else sampler, "last_fallback", None),
