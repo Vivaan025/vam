@@ -57,6 +57,8 @@ def main() -> None:
     ap.add_argument("--calib-videos", type=int, default=3)
     ap.add_argument("--calib-repeats", type=int, default=2)
     ap.add_argument("--no-cache", action="store_true", help="re-fit the cost model instead of using the cached one")
+    ap.add_argument("--coverage-router", default=None, help="019: coverage estimator .npz ('default' = packaged); routes to uniform before scoring")
+    ap.add_argument("--max-coverage", type=float, default=0.5, help="route to uniform when predicted (or window) coverage exceeds this")
     ap.add_argument("--out", default="results/thumos14_scheduler.jsonl")
     args = ap.parse_args()
 
@@ -80,13 +82,20 @@ def main() -> None:
     extractor = make_extractor(args.backbone, device=device)
     probe = LinearProbe(extractor, len(head_classes), head_classes).load_head(args.head)
 
+    cov = None
+    if args.coverage_router:
+        from vam.sampling import CoverageEstimator, default_estimator
+
+        cov = default_estimator() if args.coverage_router == "default" else CoverageEstimator.load(args.coverage_router)
+
     def make_sampler(cfg: Config, video_id: str, planner=None) -> KeyframeSampler:
         sc = learned.for_video(video_id)
         # With a planner the post-scan plan may switch refinement on, so the sampler always carries the scorer
         # and the planner toggles it (011 erratum: before this, a grow-into-refinement was logged but never ran).
         return KeyframeSampler(cfg.frames, sc, segments=cfg.segments, alloc="softmax", temperature=0.2,
                                refine=sc if (cfg.refine or planner is not None) else None,
-                               refine_stride=cfg.stride, planner=planner)
+                               refine_stride=cfg.stride, planner=planner, coverage_estimator=cov,
+                               max_coverage=args.max_coverage)
 
     def run_once(sampler: KeyframeSampler, v):
         p = vam.Profiler()
