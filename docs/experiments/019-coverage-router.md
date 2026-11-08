@@ -48,7 +48,25 @@ fallback counts by reason.
   Charades multi-action) may bias the threshold; evaluation is per dataset.
 
 ## Results
-pending
+### 2026-11-08: H1 fails for pixel-level scan features
+Ridge on 13 scan statistics, trained on THUMOS14 val + ActivityNet train + Charades train (9,323 videos), held
+out THUMOS14 test / ActivityNet val / Charades test:
+
+| set | n | coverage median | predicted median | Spearman | MAE | routed to uniform at 0.5 / 0.6 / 0.7 |
+|---|---|---|---|---|---|---|
+| THUMOS14 test (held) | 212 | 0.26 | 0.63 | −0.09 | 0.35 | 0.80 / 0.58 / 0.29 |
+| ActivityNet val (held) | 4,926 | 0.73 | 0.66 | 0.27 | 0.23 | 0.93 / 0.70 / 0.39 |
+| Charades test (held) | 1,814 | 1.00 | 0.92 | 0.12 | 0.10 | 1.00 / 1.00 / 1.00 |
+
+- Within a dataset the features carry almost no coverage signal (THUMOS14 ρ ≈ 0). Between datasets only
+  Charades separates (30 s clips: duration does it); THUMOS14 sports broadcasts and ActivityNet YouTube videos
+  are indistinguishable at the thumbnail level (predicted medians 0.63 vs 0.66). No threshold keeps ≥ 80 % of
+  THUMOS14 on the keyframe path while sending ≥ 80 % of ActivityNet to uniform. The feature pass also costs
+  30–40 ms on long videos (thousands of thumbnails), a third of the scan.
+- Reading: "how much the picture changes" is not "how much of the timeline is the action". Coverage is
+  semantic. Next (the Risks fallback): statistics of the *learned scorer's* keyframe scores, which the normal
+  path already computes, as the estimate; the saving is then the window decode and refinement, not the scan.
+
 
 ## Decision
 pending
