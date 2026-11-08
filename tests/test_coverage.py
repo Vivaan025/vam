@@ -5,8 +5,8 @@ import pytest
 
 import vam
 from vam.runtime.scan import Keyframes, scan_keyframes
-from vam.sampling import CoverageEstimator, KeyframeSampler, scan_features
-from vam.sampling.coverage import FEATURE_NAMES
+from vam.sampling import CoverageEstimator, KeyframeSampler, scan_features, score_features
+from vam.sampling.coverage import FEATURE_NAMES, SCORE_FEATURE_NAMES
 
 
 def _kf(k, seed=0, h=16, w=16):
@@ -84,3 +84,35 @@ def test_features_from_a_real_scan(h264_video):
     f = scan_features(kf)
     assert f.shape == (len(FEATURE_NAMES),) and np.all(np.isfinite(f))
     assert np.isclose(f[0], np.log1p(kf.duration))
+
+
+def test_score_features_and_scores_estimator_runs_after_scoring(h264_video, tmp_path):
+    for sc in (np.zeros(0), np.zeros(1), np.linspace(0, 1, 30), np.array([5.0, -1.0, 0.2])):
+        f = score_features(sc, np.arange(len(sc)) * 2.0, 60.0)
+        assert f.shape == (len(SCORE_FEATURE_NAMES),) and np.all(np.isfinite(f))
+    peaked = score_features(np.r_[np.zeros(29), 3.0], np.arange(30) * 2.0, 60.0)
+    flat = score_features(np.zeros(30), np.arange(30) * 2.0, 60.0)
+    names = dict(zip(SCORE_FEATURE_NAMES, peaked))
+    assert names["entropy_softmax"] < dict(zip(SCORE_FEATURE_NAMES, flat))["entropy_softmax"]
+    rng = np.random.RandomState(0)
+    X = rng.randn(100, len(SCORE_FEATURE_NAMES))
+    est = CoverageEstimator.fit(X, np.full(100, 0.9), kind="scores")
+    est.save(tmp_path / "s.npz")
+    est = CoverageEstimator.load(tmp_path / "s.npz")
+    assert est.kind == "scores"
+    path, fps, n = h264_video
+    calls = []
+
+    def scorer(kf):
+        calls.append(len(kf))
+        return np.linspace(0, 1, len(kf))
+
+    v = vam.load_video(path)
+    try:
+        s = KeyframeSampler(4, scorer, refine=None, coverage_estimator=est)
+        idx = s.select(v)
+        assert len(calls) == 1  # scored first, then routed
+        assert s.last_fallback == "predicted-coverage" and s.last_predicted_coverage is not None and s.last_scores is not None
+        assert idx == s.uniform_indices(v)
+    finally:
+        v.close()

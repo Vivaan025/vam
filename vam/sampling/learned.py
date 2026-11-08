@@ -121,10 +121,14 @@ class LearnedScorer:
         return self.heads
 
     @torch.inference_mode()
-    def __call__(self, kf: Keyframes) -> np.ndarray:
-        e = self.embedder.embed(kf.thumbs)
-        gaps = torch.as_tensor(np.append(np.diff(kf.times), 5.0), device=e.device)
+    def scores_from_embedding(self, emb: torch.Tensor, times: np.ndarray) -> np.ndarray:
+        """Scores for already-embedded keyframes (K, D) at `times` (019: score statistics from cached features)."""
+        e = emb.to(self.device)
+        gaps = torch.as_tensor(np.append(np.diff(np.asarray(times, dtype=np.float64)), 5.0), device=e.device)
         zs = torch.as_tensor(self.embedder.scores_from_embedding(e), device=e.device) if self.use_zs else None
         x = build_features(e, gaps, zs, self.context)
         out = torch.stack([h(x) for h in self._heads()]).mean(0)
         return out.float().cpu().numpy()
+
+    def __call__(self, kf: Keyframes) -> np.ndarray:
+        return self.scores_from_embedding(self.embedder.embed(kf.thumbs), kf.times)

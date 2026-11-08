@@ -170,8 +170,9 @@ class KeyframeSampler(Sampler):
         kf = scan_keyframes(video.path, thumb=self.thumb, workers=self.scan_workers, stride=self.keyframe_stride,
                             backend=self.scan_backend)
         self.last_predicted_coverage = None
-        if self.coverage_estimator is not None and self.fallback == "uniform":
-            self.last_predicted_coverage = float(self.coverage_estimator.predict(kf))
+        est = self.coverage_estimator if self.fallback == "uniform" else None
+        if est is not None and getattr(est, "kind", "scan") != "scores":
+            self.last_predicted_coverage = float(est.predict(kf))
             if self.last_predicted_coverage > self.max_coverage:
                 self.last_keyframes, self.last_scores = kf, None
                 return self._fallback(video, "predicted-coverage")
@@ -179,6 +180,10 @@ class KeyframeSampler(Sampler):
         if scores.shape != (len(kf),):
             raise ValueError(f"scorer returned {scores.shape}, expected ({len(kf)},)")
         self.last_keyframes, self.last_scores = kf, scores
+        if est is not None and getattr(est, "kind", "scan") == "scores":
+            self.last_predicted_coverage = float(est.predict(kf, scores))
+            if self.last_predicted_coverage > self.max_coverage:
+                return self._fallback(video, "predicted-coverage")
         flat = self.is_flat(scores)
         if self.fallback == "uniform" and self.planner is None:
             if len(kf) < 2:

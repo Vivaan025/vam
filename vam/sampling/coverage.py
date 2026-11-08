@@ -60,39 +60,74 @@ def scan_features(kf) -> np.ndarray:
     ], dtype=np.float64)
 
 
+SCORE_FEATURE_NAMES = [
+    "log_duration", "log_num_kf", "s_mean", "s_std", "s_max", "s_max_minus_mean", "s_p90_minus_p50",
+    "frac_above_mean_std", "frac_above_half_max", "entropy_softmax", "top4_mass", "s_min",
+]
+
+
+def score_features(scores: np.ndarray, times: np.ndarray, duration: float) -> np.ndarray:
+    """Fixed-length vector from the learned scorer's keyframe scores (019): how peaked the scores are along the
+    video is the semantic analogue of coverage (a few high keyframes = the action is a small part of it)."""
+    s = np.asarray(scores, dtype=np.float64).ravel()
+    if len(s) == 0:
+        s = np.zeros(1)
+    k = len(s)
+    duration = max(float(duration), 1e-3)
+    mu, sd, mx, mn = float(s.mean()), float(s.std()), float(s.max()), float(s.min())
+    p90, p50 = float(np.percentile(s, 90)), float(np.percentile(s, 50))
+    frac_ms = float(np.mean(s > mu + sd)) if sd > 0 else 0.0
+    frac_hm = float(np.mean(s > 0.5 * mx)) if mx > 0 else 1.0
+    z = (s - mu) / 0.2
+    pz = np.exp(z - z.max())
+    pz /= pz.sum()
+    entropy = float(-(pz * np.log(pz + 1e-12)).sum() / np.log(k)) if k > 1 else 1.0
+    top4 = float(np.sort(pz)[-4:].sum())
+    return np.array([np.log1p(duration), np.log1p(k), mu, sd, mx, mx - mu, p90 - p50, frac_ms, frac_hm, entropy, top4, mn],
+                    dtype=np.float64)
+
+
 class CoverageEstimator:
     """Ridge regression on standardised scan features -> predicted action coverage in [0, 1]."""
 
-    def __init__(self, weights: np.ndarray, bias: float, mean: np.ndarray, std: np.ndarray):
+    def __init__(self, weights: np.ndarray, bias: float, mean: np.ndarray, std: np.ndarray, kind: str = "scan"):
+        self.kind = kind  # "scan": features from the thumbnails; "scores": from the learned scorer's scores
         self.w = np.asarray(weights, dtype=np.float64)
         self.b = float(bias)
         self.mu = np.asarray(mean, dtype=np.float64)
         self.sigma = np.where(np.asarray(std, dtype=np.float64) > 0, std, 1.0)
 
     @classmethod
-    def fit(cls, X: np.ndarray, y: np.ndarray, alpha: float = 1.0) -> "CoverageEstimator":
+    def fit(cls, X: np.ndarray, y: np.ndarray, alpha: float = 1.0, kind: str = "scan") -> "CoverageEstimator":
         X, y = np.asarray(X, dtype=np.float64), np.asarray(y, dtype=np.float64)
         mu, sigma = X.mean(axis=0), X.std(axis=0)
         sigma = np.where(sigma > 0, sigma, 1.0)
         Z = (X - mu) / sigma
         A = Z.T @ Z + alpha * np.eye(Z.shape[1])
         w = np.linalg.solve(A, Z.T @ (y - y.mean()))
-        return cls(w, float(y.mean()), mu, sigma)
+        return cls(w, float(y.mean()), mu, sigma, kind)
 
     def predict_features(self, X: np.ndarray) -> np.ndarray:
         Z = (np.atleast_2d(np.asarray(X, dtype=np.float64)) - self.mu) / self.sigma
         return np.clip(Z @ self.w + self.b, 0.0, 1.0)
 
-    def predict(self, kf) -> float:
+    def predict(self, kf, scores: np.ndarray | None = None) -> float:
+        """Coverage estimate for a scan; a "scores" estimator needs the scorer's keyframe scores too."""
+        if self.kind == "scores":
+            if scores is None:
+                raise ValueError("this estimator needs the keyframe scores (kind='scores')")
+            return float(self.predict_features(score_features(scores, kf.times, kf.duration))[0])
         return float(self.predict_features(scan_features(kf))[0])
 
     def save(self, path: str | os.PathLike) -> None:
-        np.savez(path, w=self.w, b=self.b, mu=self.mu, sigma=self.sigma, names=np.array(FEATURE_NAMES))
+        names = SCORE_FEATURE_NAMES if self.kind == "scores" else FEATURE_NAMES
+        np.savez(path, w=self.w, b=self.b, mu=self.mu, sigma=self.sigma, names=np.array(names), kind=np.array(self.kind))
 
     @classmethod
     def load(cls, path: str | os.PathLike) -> "CoverageEstimator":
         d = np.load(path, allow_pickle=False)
-        return cls(d["w"], float(d["b"]), d["mu"], d["sigma"])
+        kind = str(d["kind"]) if "kind" in d else "scan"
+        return cls(d["w"], float(d["b"]), d["mu"], d["sigma"], kind)
 
 
 _DEFAULT: CoverageEstimator | None = None
