@@ -26,6 +26,10 @@ def _load_adapters() -> None:
     except ImportError:
         pass
     import vam.models.policy  # noqa: F401  (014: FakePolicy always; OpenVLA needs transformers at call time)
+    try:
+        import vam.models.videollm  # noqa: F401  (020: Qwen3-VL video-LLM adapter, needs transformers)
+    except ImportError:
+        pass
 
 
 def list_models() -> list[str]:

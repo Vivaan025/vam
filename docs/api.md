@@ -11,7 +11,7 @@ Every public name, its signature, one line of purpose, and the experiment that j
 | **`load_video`** | `load_video(path) -> Video` | Open a file lazily; counts frames by grabbing when the container lies (still images) | 001, 013 |
 | **`Video`** | fields `path, fps, num_frames, width, height`; `duration`; `read(indices, seq_threshold=64) -> FrameBatch`; `iter_frames(start=0, stop=None, step=1)`; `close()` | A video source; random access seeks, sequential runs read forward | 001 |
 | **`FrameBatch`** | fields `frames (T,H,W,3) uint8 or (T,3,H,W) float`, `timestamps (T,)`, `indices (T,)`; `to(device)`; `channels_first()`; `is_channels_first` | What a model receives | 001 |
-| **`ActionOutput`** | fields `logits, labels, actions, features`; `top_k(k=5) -> [(label, prob)]` | What a model returns; `logits` for recognition, `actions` for a policy | 001, 014 |
+| **`ActionOutput`** | fields `logits, labels, actions, features, text`; `top_k(k=5) -> [(label, prob)]` | What a model returns; `logits` for recognition, `actions` for a policy, `text` for a video-LLM | 001, 014, 020 |
 | **`get_model`** | `get_model(name, **kwargs) -> VideoActionModel` | Build a registered model (`device=`, model-specific kwargs) | 001 |
 | **`list_models`** | `list_models() -> list[str]` | Registered names | 001 |
 | **`UniformSampler`** | `UniformSampler(num_frames)` | Evenly spaced frames; the baseline | 001 |
@@ -69,6 +69,9 @@ Every public name, its signature, one line of purpose, and the experiment that j
 | `HFFeatureExtractor`, `LinearProbe` | `HFFeatureExtractor(name, ...)`.`features(batch)`; `LinearProbe(extractor, num_classes, class_names=None)`; `LinearProbe.fit_head(features, labels, num_classes, epochs=100, lr=1e-2, weight_decay=1e-4, device="cpu")`; `save_head(path)` / `load_head(path)` | Pooled backbone features and a linear head, how every benchmark measures accuracy | 001 |
 | `FrameExitModel` | `FrameExitModel(dataset='activitynet', checkpoint=None, device=None, dtype=float16)`; `forward_frames(batch)` pools K frames and answers with the head trained for K; `exit_forward(batch)` runs FrameExit's own early exit; `frame_features(batch)` | the shared ResNet-50 classifier of the prior-work comparison; registered `frameexit-activitynet`, `frameexit-minikinetics`; checkpoints from the FrameExit release (`VAM_FRAMEEXIT_DIR`) | 017 |
 | **`ARNetModel`** | `ARNetModel(mode="ada"|"scsampler", checkpoint=None, device=None, dtype=float16, num_classes=200, num_segments=16, top_k=10, policy_px=None, skip_list=(1,2,4))` | AR-Net and its SCSampler from the released checkpoints; after a call: `last_frames_used, last_gmacs, last_decisions`; `arnet_val_indices(n)` gives its 16 frame positions | 018 |
+| **`VideoLLM`** | `VideoLLM(name="Qwen/Qwen3-VL-8B-Instruct", device=None, dtype=bfloat16, max_edge=448, max_new_tokens=8, attn_implementation=None)` | Video-LLM adapter (020): `generate(batch, prompt, fps=, num_frames=, duration=) -> str` with the frames' real timestamps passed to the processor; `answer(batch, question, options) -> letter`; `forward_frames` returns `ActionOutput(text=...)`; `last_text, last_tokens`. Registered `qwen3-vl-8b`, `qwen3-vl-4b` | 020 |
+| `answer_letter(text)` | – | first stand-alone option letter in a reply, or None | 020 |
+| `MCQ_PROMPT` | – | the Video-MME multiple-choice prompt (question + options, answer with the letter) | 020 |
 | `TorchvisionVideoClassifier` | `TorchvisionVideoClassifier(arch, device=None, dtype=float16)`; `features(batch)`; `feature_dim` | Kinetics-400 R(2+1)D-18, R3D-18, MViT-v2-S; registered `r2plus1d-18-k400`, `r3d-18-k400`, `mvit-v2-s-k400` | 014 |
 | `ActionPolicy` | `ActionPolicy(instruction="", state=None)`; implement `act(frames, instruction, state) -> (T, action_dim)`; `forward_frames(batch, instruction=None, state=None)` | A policy is a `VideoActionModel` with `default_num_frames=1` that fills `actions` | 014 |
 | `FakePolicy` | `FakePolicy(action_dim=7, **kw)`; registered `fake-policy` | Deterministic stand-in for tests and calibration | 014 |
@@ -82,6 +85,7 @@ Every public name, its signature, one line of purpose, and the experiment that j
 | `THUMOS14`, `UntrimmedVideo`, `Segment` | `THUMOS14(root, split="val", require_video=True)`; `UntrimmedVideo(path, video_id, segments)` with `.video()`, `.classes`, `.action_fraction(duration)`; `Segment(class_name, start, end)` | Untrimmed long video with temporal annotations; the main benchmark | 002 |
 | `ActivityNet` | `ActivityNet(root, split='validation')`; `.videos`, `.classes`, `.labels(uv)`, `.missing` | ActivityNet-1.3 untrimmed videos with multi-label annotations in FrameExit's class order | 017 |
 | `MiniKinetics` | `MiniKinetics(root, split='val')`; same interface | the AR-Net 200-class subset of Kinetics-400 val, trimmed 10 s clips | 017 |
+| **`VideoMME`** | `VideoMME(root, parquet=None, require_video=True)` | Video-MME: 900 videos (`MMEVideo`: youtube_id, path, duration bucket, domain) each with `MMEQuestion`s (task_type, question, options, answer); `.missing`, `.questions` | 020 |
 | `Charades` | `Charades(root, split="test", require_video=True, min_segments=1)` | Second domain (the negative result); THUMOS14-shaped | 012 |
 
 Download helpers live in `scripts/` (`download_thumos14.py`, `download_charades.py`); the benchmarks in

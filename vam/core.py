@@ -175,12 +175,14 @@ class ActionOutput:
     labels: class names aligned with logits, if known.
     actions: (T, action_dim) continuous or token actions for prediction models.
     features: optional per-frame features the runtime may cache for reuse.
+    text: the reply of a video-LLM (020), when the model answers in words.
     """
 
     logits: Optional[torch.Tensor] = None
     labels: Optional[list[str]] = None
     actions: Optional[torch.Tensor] = None
     features: Optional[torch.Tensor] = None
+    text: Optional[str] = None
 
     def top_k(self, k: int = 5) -> list[tuple[str, float]]:
         if self.logits is None:
