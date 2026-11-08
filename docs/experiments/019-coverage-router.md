@@ -1,6 +1,6 @@
 # 019 · Coverage-aware routing: decide uniform vs keyframe from the scan, before paying for scoring (roadmap R10)
 
-*Opened 2026-11-08 · Status: in progress*
+*Opened 2026-11-08 · Status: done, negative (2026-11-08)*
 
 ## Motivation
 012, 013, 017 and 018 draw one line through every result: frame selection pays when the action covers a small
@@ -67,6 +67,36 @@ out THUMOS14 test / ActivityNet val / Charades test:
   semantic. Next (the Risks fallback): statistics of the *learned scorer's* keyframe scores, which the normal
   path already computes, as the estimate; the saving is then the window decode and refinement, not the scan.
 
+### 2026-11-08: the learned scorer's score distribution does not predict coverage either
+Same protocol, 12 statistics of the packaged class-free scorer's keyframe scores (mean, spread, max − mean,
+p90 − p50, fraction above mean + std, softmax entropy, top-4 mass, duration, keyframe count), computed from the
+cached CLIP embeddings (ActivityNet val and Charades train embedded for this: 61 / 30 ms per video):
+
+| set | n | coverage median | predicted median | Spearman | MAE | routed to uniform at 0.5 / 0.6 / 0.7 |
+|---|---|---|---|---|---|---|
+| THUMOS14 test (held) | 212 | 0.26 | 0.59 | −0.08 | 0.33 | 0.79 / 0.47 / 0.18 |
+| ActivityNet val (held) | 4,926 | 0.73 | 0.66 | 0.23 | 0.24 | 0.95 / 0.73 / 0.33 |
+| Charades test (held) | 1,000 | 1.00 | 0.92 | 0.09 | 0.10 | 1.00 / 1.00 / 1.00 |
+
+- Identical picture to the pixel features: no within-dataset signal on THUMOS14, weak on ActivityNet, and the
+  two datasets' predicted medians are 0.07 apart. The scorer is trained to rank keyframes *within* a video
+  (gap-window targets, 009); its absolute level and spread carry nothing about how much of the timeline is
+  action. The feature pass itself is 0.4 ms, so cost was never the problem.
+- H1 fails for both feature families. H2 and H3 were not run: with no estimator that separates THUMOS14 from
+  ActivityNet, a routing benchmark would only measure the threshold's bias toward one dataset.
+- Not tried, on purpose: more features, a non-linear model, or a "does keyframe beat uniform on this video"
+  classifier trained on 017's per-video rows. The first two would be fitting noise (ρ ≈ 0 is not a capacity
+  problem); the third needs per-video labels a user does not have, and 1,312 + 200 training videos split
+  across two very different distributions.
 
 ## Decision
-pending
+**Negative. Action coverage is not cheaply predictable from the scan or from the scorer's scores, and the
+library will not pretend otherwise.** What stays: the post-scoring rules from 013 (flat scores, single
+keyframe, chosen windows covering > `max_coverage`), which recover two thirds of the Charades loss and fire
+on 5–21 % of ActivityNet videos; `coverage_estimator=` remains as an interface for a user who can fit one on
+their own footage (their labels, their distribution), with no packaged weights. What changes in the guidance:
+the README and the quickstart say in one sentence that the keyframe sampler is for footage where the action is
+a small part of the timeline, that `BudgetedSampler` falls back to uniform on degenerate scans but cannot
+detect high coverage, and that on high-coverage video the right sampler is `UniformSampler` or `OCSampler`.
+R10 is closed; R11 (a second low-coverage public benchmark) is the next experiment, because the claim that
+survives is "+17 on low-coverage long video", and one dataset is an anecdote.

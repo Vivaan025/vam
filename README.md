@@ -74,7 +74,7 @@ change accuracy; keyframe density changes the decode cost of every sampler, and 
 **Where it does not help:** on Charades, where the action covers 95 % of every 30 s clip, even the oracle is no
 better than uniform sampling and neither is `vam` (`docs/results/charades.md`). Frame selection pays when actions
 are a small fraction of the video. Since 013 the scheduler falls back to uniform frames when its scan carries no
-information (one keyframe, flat scores, windows that would cover most of the clip).
+information (one keyframe, flat scores, windows that would cover most of the clip). The sampler cannot detect this case from the video itself (019): on footage where the action fills the clip, use `UniformSampler` or `OCSampler`; `BudgetedSampler` falls back to uniform on degenerate scans, not on high coverage.
 
 **The same runtime serves other models.** With torchvision's R(2+1)D-18 in place of VideoMAE the selection gain is
 the same size (0.655 / 0.675 / 0.700 vs uniform 0.565 / 0.520 / 0.545 at 4 / 8 / 16 frames, ~145 ms vs 135–498 ms),
@@ -106,6 +106,7 @@ the recorded ones on BridgeData (Δxyz correlation 0.97) and the scheduler's cos
 - [x] Robustness: documented errors, no hangs, degenerate inputs answer uniform, scheduler fallback (`docs/results/robustness.md`)
 - [x] Standard benchmarks: ActivityNet-1.3 and Mini-Kinetics under the FrameExit protocol, FrameExit reproduced from its weights (`docs/results/activitynet_017.md`)
 - [x] Prior samplers on one machine: OCSampler, AR-Net, SCSampler ported from released weights and reproduced; `OCSampler` is a `vam` sampler (`docs/results/activitynet_018.md`)
+- [x] Coverage-aware routing, negative: action coverage is not predictable from the scan or the scorer's scores, so the sampler cannot detect high-coverage footage itself (`docs/experiments/019-coverage-router.md`)
 - [x] Packaging: `vam-runtime` wheel with the packaged scorer, bounded dependency ranges, CI on Linux + Windows (015)
 - [x] Docs: quickstart, API reference, `BudgetedSampler`, executable snippets (016)
 - [ ] GPU windowed decode (NVDEC) — deferred past v0.1
