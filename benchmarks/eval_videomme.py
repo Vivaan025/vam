@@ -1,7 +1,8 @@
 """Experiment 020: Video-MME multiple choice with one video-LLM, frames chosen by different samplers.
 
 Arms (``--arms``): uniform-N | keyframe-N (packaged class-free scorer, refinement on) | kfnr-N (no refinement)
-| budget-B (BudgetedSampler, B ms). One sampling per video, one generation per question.
+| hybrid-N (N/2 uniform anchors + N/2 keyframe frames, union) | budget-B (BudgetedSampler, B ms).
+One sampling per video, one generation per question.
 
     python benchmarks/eval_videomme.py --root data/videomme --arms uniform-8 keyframe-8 uniform-16 keyframe-16 --out results/videomme_020.jsonl
 """
@@ -21,7 +22,23 @@ import torch
 import vam
 from vam.data.videomme import VideoMME
 from vam.models.videollm import VideoLLM
-from vam.sampling import KeyframeSampler, UniformSampler
+from vam.sampling import KeyframeSampler, Sampler, UniformSampler
+
+
+class HybridSampler(Sampler):
+    """020 H5: evenly spaced anchors keep the whole video in view, keyframe picks add the moments."""
+
+    def __init__(self, num_frames: int, scorer):
+        super().__init__(num_frames)
+        self.uniform = UniformSampler(max(1, num_frames // 2))
+        self.keyframe = KeyframeSampler(max(1, num_frames - num_frames // 2), scorer, refine=None)
+        self.last_fallback = None
+
+    def select(self, video):
+        u = self.uniform.select(video)
+        k = self.keyframe.select(video)
+        self.last_fallback = self.keyframe.last_fallback
+        return sorted(set(u) | set(k))
 
 
 def main() -> None:
@@ -64,6 +81,8 @@ def main() -> None:
             return KeyframeSampler(int(val), scorer, refine=scorer)
         if kind == "kfnr":
             return KeyframeSampler(int(val), scorer, refine=None)
+        if kind == "hybrid":
+            return HybridSampler(int(val), scorer)
         if kind == "budget":
             return vam.BudgetedSampler(float(val), None, calibrate_on=[v.path for v in videos[:3]], scorer=scorer)
         raise ValueError(arm)
