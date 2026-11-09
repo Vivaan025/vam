@@ -80,10 +80,11 @@ Per question at 16 frames: both right 1,253, both wrong 889, uniform only 382, k
   Temporal Perception and Information Synopsis, are exactly the ones that need the whole timeline.
 - **H2 fails** too: the short bucket loses 3.7 / 9.8, because the sampler does not fall back there (1–2 min
   clips are long enough for a scan) and concentrates frames just the same.
-- **H3 holds on the decode side only.** Selection + decode is 283 ms for keyframe (scan + CLIP on every
-  keyframe of up to an hour of video + windowed decode) against 119 / 233 ms for uniform's seeks; generation
-  is 25–30 ms cheaper with keyframe frames (fewer visual tokens after resizing, since the chosen frames are
-  often the same shot), which does not matter next to the accuracy loss.
+- **H3 fails.** Selection + decode is 283 ms for keyframe (scan + CLIP on every keyframe of up to an hour
+  of video + windowed decode) against 119 / 233 ms for uniform's 8 / 16 seeks; the 150 ms "flat at any
+  budget" of 007 was measured on 1–5 min THUMOS14 videos, and an hour of video has ten times the keyframes
+  to score. Generation is 25–30 ms cheaper with keyframe frames (fewer visual tokens, the chosen frames often
+  share a shot), which does not matter next to the accuracy loss.
 - **Reference check:** uniform-16 at 448 px gives 0.606; Qwen3-VL-8B's reported Video-MME score (without
   subtitles, many more frames at higher resolution) is around 0.71, so the adapter is in the expected range
   for 16 small frames and the timestamps are being used (keyframe prompts carry irregular times).
